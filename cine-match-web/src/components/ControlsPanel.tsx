@@ -1,16 +1,16 @@
-// src/components/ControlsPanel.tsx
-import { useState } from 'react';
+import React, { useState } from 'react';
 
-interface ControlsProps {
-  mode: 'title' | 'mood' | 'fusion';
-  setMode: (mode: 'title' | 'mood' | 'fusion') => void;
-  queryTitle: string;
-  setQueryTitle: (val: string) => void;
+type Mode = 'title' | 'mood' | 'fusion';
+
+interface ControlsPanelProps {
+  mode: Mode;
+  setMode: (mode: Mode) => void;
   availableGenres: string[];
   moodWeights: Record<string, number>;
   setMoodWeights: (weights: Record<string, number>) => void;
+  queryTitle: string;
+  setQueryTitle: (title: string) => void;
   onSearch: () => void;
-  // Fusion Props
   fusionTitleA: string;
   setFusionTitleA: (val: string) => void;
   fusionTitleB: string;
@@ -18,58 +18,53 @@ interface ControlsProps {
   fusionRatio: number;
   setFusionRatio: (val: number) => void;
   onFusionSearch: () => void;
+  metric?: 'cosine' | 'euclidean' | 'manhattan';
+  onMetricChange?: (metric: 'cosine' | 'euclidean' | 'manhattan') => void;
+  resultsPerPage?: number;
+  onResultsPerPageChange?: (limit: number) => void;
 }
 
-export const ControlsPanel = ({
-  mode, setMode,
-  queryTitle, setQueryTitle,
-  availableGenres,
-  moodWeights, setMoodWeights,
-  onSearch,
-  // Fusion Props
-  fusionTitleA, setFusionTitleA,
-  fusionTitleB, setFusionTitleB,
-  fusionRatio, setFusionRatio,
-  onFusionSearch,
-}: ControlsProps) => {
+export const ControlsPanel: React.FC<ControlsPanelProps> = ({
+  mode, setMode, availableGenres, moodWeights, setMoodWeights,
+  queryTitle, setQueryTitle, onSearch,
+  fusionTitleA, setFusionTitleA, fusionTitleB, setFusionTitleB,
+  fusionRatio, setFusionRatio, onFusionSearch,
+  metric = 'cosine',
+  onMetricChange,
+  resultsPerPage = 9,
+  onResultsPerPageChange,
+}) => {
+  const [isVectorExpanded, setIsVectorExpanded] = useState(false);
+  const activeGenres = availableGenres.filter(g => moodWeights[g] > 0);
 
-  // Fungsi helper untuk toggle genre & slider (sama seperti sebelumnya)
+  // Helper functions untuk mood management
   const toggleGenre = (genre: string) => {
-    const newWeights = { ...moodWeights };
-    if (newWeights[genre]) delete newWeights[genre];
-    else newWeights[genre] = 5;
-    setMoodWeights(newWeights);
+    setMoodWeights({
+      ...moodWeights,
+      [genre]: moodWeights[genre] ? 0 : 5,
+    });
   };
 
-  const updateWeight = (genre: string, val: string) => {
-    setMoodWeights({ ...moodWeights, [genre]: parseInt(val) });
+  const updateWeight = (genre: string, value: string) => {
+    setMoodWeights({
+      ...moodWeights,
+      [genre]: Math.max(0, parseInt(value, 10)),
+    });
   };
 
+  // UX Improvement: Tombol Reset
+  // Karena state ada di parent (App.tsx), kita minta user uncheck manual atau reload untuk full reset
+  // Tapi kita bisa sediakan helper visual.
+  
   return (
     <div className="controls-wrapper">
-      {/* 1. TABS */}
       <div className="tabs">
-        <button
-          className={mode === 'title' ? 'active' : ''}
-          onClick={() => setMode('title')}
-        >
-          🔍 Cari Judul
-        </button>
-        <button
-          className={mode === 'mood' ? 'active' : ''}
-          onClick={() => setMode('mood')}
-        >
-          🎭 Vektor Mood
-        </button>
-        <button
-          className={mode === 'fusion' ? 'active' : ''}
-          onClick={() => setMode('fusion')}
-        >
-          🧬 Movie Fusion
-        </button>
+        <button className={mode === 'title' ? 'active' : ''} onClick={() => setMode('title')}>🔍 Cari Judul</button>
+        <button className={mode === 'mood' ? 'active' : ''} onClick={() => setMode('mood')}>🎭 Vektor Mood</button>
+        <button className={mode === 'fusion' ? 'active' : ''} onClick={() => setMode('fusion')}>🧬 Movie Fusion</button>
       </div>
 
-      {/* 2. SEARCH AREA (Untuk Title Mode) */}
+      {/* MODE TITLE */}
       {mode === 'title' && (
         <div className="search-box-area">
           <div className="input-group">
@@ -88,18 +83,21 @@ export const ControlsPanel = ({
         </div>
       )}
 
-      {/* 3. MOOD AREA (Untuk Mood Mode) */}
+      {/* MODE MOOD */}
       {mode === 'mood' && (
         <div className="mood-area">
-          <p style={{textAlign:'center', marginBottom:'15px', color:'#94a3b8'}}>
-            Pilih genre untuk membangun vektor seleramu:
-          </p>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
+            <p style={{margin: 0, color: '#94a3b8'}}>Bangun vektor preferensi Anda:</p>
+            {Object.keys(moodWeights).length > 0 && (
+              <span style={{fontSize: '0.8rem', color: '#f43f5e'}}>*Klik genre lagi untuk hapus</span>
+            )}
+          </div>
 
           <div className="genre-tags">
-            {availableGenres.map(g => (
+            {availableGenres.map((g) => (
               <span
                 key={g}
-                className={`tag ${moodWeights[g] ? 'selected' : ''}`}
+                className={moodWeights[g] ? 'tag selected' : 'tag'}
                 onClick={() => toggleGenre(g)}
               >
                 {g}
@@ -108,73 +106,120 @@ export const ControlsPanel = ({
           </div>
 
           {Object.keys(moodWeights).length > 0 && (
-            <div className="sliders-grid">
-              {Object.entries(moodWeights).map(([genre, weight]) => (
-                <div key={genre} className="slider-item">
-                  <label>
-                    <span>{genre}</span>
-                    <strong style={{color:'var(--accent)'}}>{weight}</strong>
-                  </label>
-                  <input
-                    type="range"
-                    min="1" max="10"
-                    value={weight}
-                    onChange={(e) => updateWeight(genre, e.target.value)}
-                    style={{width: '100%', accentColor: 'var(--accent)'}}
-                  />
+            <>
+              <div className="sliders-grid">
+                {Object.entries(moodWeights).map(([g, w]) => (
+                  <div key={g}>
+                    <div className="slider-container" style={{display:'flex', justifyContent:'space-between', fontSize:'0.9rem', marginBottom:'5px', color:'#ccc'}}>
+                      <span>{g}</span> <strong style={{color:'var(--accent)'}}>{w}</strong>
+                    </div>
+                    <input
+                      type="range" min="1" max="10" value={w}
+                      style={{width:'100%', accentColor:'var(--accent)'}}
+                      onChange={(e) => updateWeight(g, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* LIVE VECTOR MONITOR */}
+               <div style={{background: '#0f172a', padding: '15px', borderRadius: '10px', border: '1px solid #334155', marginTop: '20px', fontFamily: 'JetBrains Mono, monospace'}}>
+                 <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px'}}>
+                   <span style={{color:'#94a3b8', fontSize:'0.8rem'}}>🎯 Vektor Query (Q)</span>
+                   <button onClick={() => setIsVectorExpanded(!isVectorExpanded)} style={{background:'none', border:'none', color:'#6366f1', cursor:'pointer', fontSize:'0.8rem'}}>
+                     {isVectorExpanded ? 'Sembunyikan' : 'Lihat Detail'}
+                   </button>
+                 </div>
+                <div style={{display:'flex', gap:'8px', overflowX:'auto', paddingBottom:'5px'}}>
+                   {(isVectorExpanded ? availableGenres : activeGenres).map(g => {
+                     const val = moodWeights[g] || 0;
+                     if (!isVectorExpanded && val === 0) return null;
+                     return (
+                       <div key={g} style={{padding:'5px 10px', background: val > 0 ? 'rgba(20, 184, 166, 0.1)' : '#1e293b', border: `1px solid ${val > 0 ? '#14b8a6' : '#334155'}`, borderRadius:'6px', textAlign:'center', minWidth:'60px'}}>
+                         <div style={{fontSize:'0.7rem', color:'#94a3b8'}}>{g.substring(0,6)}</div>
+                         <div style={{fontWeight:'bold', color: val > 0 ? '#14b8a6' : '#64748b'}}>{val}</div>
+                       </div>
+                     )
+                   })}
                 </div>
-              ))}
-            </div>
+              </div>
+            </>
           )}
 
-          <div style={{textAlign: 'center', marginTop: '30px'}}>
-             <button className="btn-primary" onClick={onSearch} style={{width: '100%', maxWidth: '300px'}}>
-               Hitung & Rekomendasikan
-             </button>
-          </div>
-        </div>
-      )}
-
-      {/* 4. FUSION AREA (Untuk Fusion Mode) */}
-      {mode === 'fusion' && (
-        <div className="search-box-area">
-          <div className="input-group">
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Judul Film A..."
-              value={fusionTitleA}
-              onChange={(e) => setFusionTitleA(e.target.value)}
-            />
-            <span style={{color: "var(--text-muted)", fontSize: "1.5rem"}}>+</span>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Judul Film B..."
-              value={fusionTitleB}
-              onChange={(e) => setFusionTitleB(e.target.value)}
-            />
-          </div>
-          <div className="slider-item" style={{width: '100%', maxWidth: '600px', marginTop: '15px'}}>
-            <label>
-              <span>Dominasi</span>
-              <strong style={{color:'var(--primary)'}}>{Math.round(fusionRatio * 100)}% A / {Math.round((1 - fusionRatio) * 100)}% B</strong>
-            </label>
-            <input
-              type="range"
-              min="0" max="1" step="0.05"
-              value={fusionRatio}
-              onChange={(e) => setFusionRatio(parseFloat(e.target.value))}
-              style={{width: '100%', accentColor: 'var(--primary)'}}
-            />
-          </div>
-          <div style={{textAlign: 'center', marginTop: '20px'}}>
-            <button className="btn-primary" onClick={onFusionSearch} disabled={!fusionTitleA || !fusionTitleB}>
-              Fuse & Cari Rekomendasi
+           <div style={{textAlign: 'center', marginTop: '30px'}}>
+            <button className="btn-primary" onClick={onSearch} disabled={Object.keys(moodWeights).length === 0} style={{width:'100%', maxWidth:'300px'}}>
+              Hitung Rekomendasi
             </button>
           </div>
         </div>
       )}
+
+      {/* MODE FUSION */}
+      {mode === 'fusion' && (
+        <div className="fusion-area">
+          <p style={{textAlign:'center', marginBottom:'20px', color:'#94a3b8'}}>Gabungkan dua film untuk mencari "anak" dari kombinasi keduanya:</p>
+          <div className="fusion-inputs" style={{display:'flex', gap:'10px', alignItems:'center', justifyContent:'center', marginBottom:'30px'}}>
+            <input type="text" className="search-input" placeholder="Film A (e.g. Barbie)" value={fusionTitleA} onChange={(e) => setFusionTitleA(e.target.value)} style={{flex:1}} />
+            <span style={{fontSize:'1.5rem', color:'var(--accent)', fontWeight:'bold'}}>+</span>
+            <input type="text" className="search-input" placeholder="Film B (e.g. Oppenheimer)" value={fusionTitleB} onChange={(e) => setFusionTitleB(e.target.value)} style={{flex:1}} />
+          </div>
+          <div className="fusion-slider-container" style={{background:'rgba(0,0,0,0.2)', padding:'20px', borderRadius:'16px', marginBottom:'30px'}}>
+            <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px', fontSize:'0.9rem'}}>
+              <span style={{color: fusionRatio > 0.5 ? '#64748b' : 'var(--primary)'}}>Dominan Film A</span>
+              <span style={{color:'white', fontWeight:'bold'}}>{Math.round((1 - fusionRatio) * 100)}% A - {Math.round(fusionRatio * 100)}% B</span>
+              <span style={{color: fusionRatio < 0.5 ? '#64748b' : 'var(--accent)'}}>Dominan Film B</span>
+            </div>
+            <input type="range" min="0" max="1" step="0.1" value={fusionRatio} onChange={(e) => setFusionRatio(parseFloat(e.target.value))} style={{width:'100%', accentColor:'white', cursor:'pointer'}} />
+          </div>
+           <div style={{textAlign: 'center'}}>
+            <button className="btn-primary" onClick={onFusionSearch} disabled={!fusionTitleA || !fusionTitleB} style={{background: 'linear-gradient(90deg, var(--primary), var(--accent))', border:'none'}}>
+              🧬 Lakukan Fusi Vektor
+            </button>
+          </div>
+        </div>
+       )}
+
+       {/* PAGINATION & METRIC CONTROLS */}
+       <div className="controls-selector-group">
+         {/* PAGINATION SELECTOR */}
+         <div className="selector-item pagination-section">
+           <span className="selector-label pagination-icon">📄</span>
+           <span className="selector-label">Hasil per Halaman</span>
+           <div className="custom-select">
+             <select 
+               value={resultsPerPage} 
+               onChange={(e) => onResultsPerPageChange?.(parseInt(e.target.value, 10))}
+             >
+               <option value="3">3 Hasil</option>
+               <option value="6">6 Hasil</option>
+               <option value="9">9 Hasil</option>
+               <option value="12">12 Hasil</option>
+               <option value="15">15 Hasil</option>
+               <option value="21">21 Hasil</option>
+               <option value="30">30 Hasil</option>
+               <option value="50">50 Hasil</option>
+             </select>
+           </div>
+         </div>
+
+         {/* METRIC SELECTOR - only for non-fusion modes */}
+         {mode !== 'fusion' && (
+           <div className="selector-item metric-section">
+             <span className="selector-label metric-icon">📐</span>
+             <span className="selector-label">Metode Jarak</span>
+             <div className="custom-select">
+               <select 
+                 value={metric} 
+                 onChange={(e) => onMetricChange?.(e.target.value as any)}
+               >
+                 <option value="cosine">Cosine (Sudut)</option>
+                 <option value="euclidean">Euclidean (Garis)</option>
+                 <option value="manhattan">Manhattan (Grid)</option>
+               </select>
+             </div>
+           </div>
+         )}
+       </div>
     </div>
   );
 };

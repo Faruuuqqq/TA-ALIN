@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Post, Body } from '@nestjs/common';
+import { Controller, Get, Query, Post, Body, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { RecommendationService } from './recommendation/recommendation.service';
 import { MovieService } from './movie/movie.service';
 
@@ -13,39 +13,53 @@ export class AppController {
   getRecommendations(
     @Query('title') title: string,
     @Query('metric') metric: 'cosine' | 'euclidean' | 'manhattan' = 'cosine',
+    @Query('limit') limit: number = 9,
   ) {
     if (!title) {
-      return {
-        message:
-          'Mohon masukkan judul film. Contoh: /recommend?title=The Batman',
-      };
+      throw new BadRequestException({
+        message: 'Mohon masukkan judul film. Contoh: /recommend?title=The Batman',
+        error: 'MISSING_TITLE',
+      });
     }
 
-    const startTime = performance.now(); // Hitung durasi proses (opsional, buat keren-kerenan)
+    // Validate limit
+    const validLimit = Math.min(Math.max(parseInt(String(limit), 10) || 9, 1), 50);
 
-    const results = this.recommendationService.recommend(title, 9, metric);
+    const startTime = performance.now();
 
-    const endTime = performance.now();
+    try {
+      const results = this.recommendationService.recommend(title, validLimit, metric);
 
-    // Format response agar rapi
-    return {
-      meta: {
-        query: title,
-        execution_time: `${(endTime - startTime).toFixed(2)} ms`,
-        algorithm: metric.toUpperCase(), // Info algoritma di response
-      },
-      data: results.map((res) => ({
-        title: res.movie.title,
-        genres: res.movie.genres,
-        similarity_score: res.score.toFixed(4), // Ambil 4 angka desimal
-        // Penjelasan matematis untuk setiap item (Bagus buat demo dosen!)
-        math_explanation: `Skor ${res.score.toFixed(
-          4,
-        )} menggunakan metode ${metric}.`,
-        poster: res.movie.posterUrl,
-        vector: res.movie.vector,
-      })),
-    };
+      const endTime = performance.now();
+
+      return {
+        meta: {
+          query: title,
+          execution_time: `${(endTime - startTime).toFixed(2)} ms`,
+          algorithm: metric.toUpperCase(),
+          total_results: results.length,
+        },
+        data: results.map((res) => ({
+          title: res.movie.title,
+          genres: res.movie.genres,
+          similarity_score: res.score.toFixed(4),
+          math_explanation: `Skor ${res.score.toFixed(4)} menggunakan metode ${metric}.`,
+          poster: res.movie.posterUrl,
+          vector: res.movie.vector,
+        })),
+      };
+    } catch (error) {
+      if (error.message.includes('tidak ditemukan')) {
+        throw new BadRequestException({
+          message: error.message,
+          error: 'MOVIE_NOT_FOUND',
+        });
+      }
+      throw new InternalServerErrorException({
+        message: 'Terjadi kesalahan saat memproses rekomendasi',
+        error: 'PROCESSING_ERROR',
+      });
+    }
   }
 
   @Get('genres')
@@ -57,100 +71,158 @@ export class AppController {
   @Get('recommend/mood')
   getRecommendationsByMood(
     @Query('weights') weightsParam: string,
-    @Query('metric') metric: 'cosine' | 'euclidean' | 'manhattan' = 'cosine', // <--- Terima param
+    @Query('metric') metric: 'cosine' | 'euclidean' | 'manhattan' = 'cosine',
+    @Query('limit') limit: number = 21,
   ) {
+    if (!weightsParam) {
+      throw new BadRequestException({
+        message: 'Parameter weights diperlukan. Format: {"Action":10,"Comedy":5}',
+        error: 'MISSING_WEIGHTS',
+      });
+    }
+
+    // Validate limit
+    const validLimit = Math.min(Math.max(parseInt(String(limit), 10) || 21, 1), 50);
+
     try {
-      // Frontend akan kirim string JSON: '{"Action":10,"Comedy":5}'
-      // Kita parse balik jadi Object
       const weights = JSON.parse(weightsParam);
 
+      if (Object.keys(weights).length === 0) {
+        throw new Error('Weights tidak boleh kosong');
+      }
+
       const { recommendations, queryVector } =
-        this.recommendationService.recommendByGenres(weights, 21, metric);
+        this.recommendationService.recommendByGenres(weights, validLimit, metric);
 
       return {
         meta: {
           query: weights,
-          algorithm: metric.toUpperCase(), // Info algoritma di response
+          algorithm: metric.toUpperCase(),
           target_vector: queryVector,
+          total_results: recommendations.length,
         },
         data: recommendations.map((res) => ({
           title: res.movie.title,
           genres: res.movie.genres,
           similarity_score: res.score.toFixed(4),
-          math_explanation: `Skor ${res.score.toFixed(
-            4,
-          )} menggunakan metode ${metric}.`,
+          math_explanation: `Skor ${res.score.toFixed(4)} menggunakan metode ${metric}.`,
           poster: res.movie.posterUrl,
           vector: res.movie.vector,
         })),
       };
     } catch (e) {
-      return { message: 'Format weights salah. Gunakan JSON.' };
+      if (e instanceof SyntaxError) {
+        throw new BadRequestException({
+          message: 'Format weights salah. Gunakan format JSON yang valid.',
+          error: 'INVALID_JSON',
+        });
+      }
+      throw new BadRequestException({
+        message: e.message || 'Error memproses weights parameter',
+        error: 'WEIGHTS_PROCESSING_ERROR',
+      });
     }
   }
 
   @Post('recommend/taste')
   getRecommendationsByTaste(@Body() body: { movieIds: number[] }) {
     if (!body.movieIds || body.movieIds.length === 0) {
-      return { message: 'Pilih minimal 1 film.' };
+      throw new BadRequestException({
+        message: 'Pilih minimal 1 film.',
+        error: 'MISSING_MOVIE_IDS',
+      });
     }
 
-    const results = this.recommendationService.recommendByTasteProfile(
-      body.movieIds,
-    );
+    try {
+      const results = this.recommendationService.recommendByTasteProfile(
+        body.movieIds,
+      );
 
-    return {
-      meta: {
-        query_count: body.movieIds.length,
-        algorithm: 'Vector Centroid (Average)',
-      },
-      data: results.map((res) => ({
-        title: res.movie.title,
-        genres: res.movie.genres,
-        similarity_score: res.score.toFixed(4),
-        poster: res.movie.posterUrl,
-        vector: res.movie.vector,
-        math_explanation: `Film ini memiliki kemiripan ${res.score.toFixed(
-          4,
-        )} dengan profil rata-rata seleramu.`,
-      })),
-    };
+      return {
+        meta: {
+          query_count: body.movieIds.length,
+          algorithm: 'Vector Centroid (Average)',
+          total_results: results.length,
+        },
+        data: results.map((res) => ({
+          title: res.movie.title,
+          genres: res.movie.genres,
+          similarity_score: res.score.toFixed(4),
+          poster: res.movie.posterUrl,
+          vector: res.movie.vector,
+          math_explanation: `Film ini memiliki kemiripan ${res.score.toFixed(
+            4,
+          )} dengan profil rata-rata seleramu.`,
+        })),
+      };
+    } catch (error) {
+      throw new InternalServerErrorException({
+        message: error.message || 'Error memproses taste profile',
+        error: 'TASTE_PROCESSING_ERROR',
+      });
+    }
   }
 
   @Post('recommend/fusion')
   getRecommendationsByFusion(
-    @Body() body: { titleA: string; titleB: string; ratio: number },
+    @Body() body: { titleA: string; titleB: string; ratio: number; limit?: number },
   ) {
-    const { titleA, titleB, ratio } = body;
+    const { titleA, titleB, ratio, limit = 12 } = body;
+
     if (!titleA || !titleB || ratio === undefined) {
-      return { message: 'Butuh 2 judul film dan 1 rasio.' };
+      throw new BadRequestException({
+        message: 'Butuh 2 judul film dan 1 rasio (0-1).',
+        error: 'MISSING_FUSION_PARAMS',
+      });
     }
 
-    const { recommendations, fusionVector } =
-      this.recommendationService.recommendByFusion(titleA, titleB, ratio);
+    if (ratio < 0 || ratio > 1) {
+      throw new BadRequestException({
+        message: 'Rasio harus antara 0 dan 1.',
+        error: 'INVALID_RATIO',
+      });
+    }
 
-    return {
-      meta: {
-        query: {
-          film_a: titleA,
-          film_b: titleB,
-          ratio: `${(ratio * 100).toFixed(0)}% : ${((1 - ratio) * 100).toFixed(
-            0,
-          )}%`,
+    // Validate limit
+    const validLimit = Math.min(Math.max(parseInt(String(limit), 10) || 12, 1), 50);
+
+    try {
+      const { recommendations, fusionVector } =
+        this.recommendationService.recommendByFusion(titleA, titleB, ratio, validLimit);
+
+      return {
+        meta: {
+          query: {
+            film_a: titleA,
+            film_b: titleB,
+            ratio: `${(ratio * 100).toFixed(0)}% : ${((1 - ratio) * 100).toFixed(0)}%`,
+          },
+          algorithm: 'Linear Combination (Vector Fusion)',
+          target_vector: fusionVector,
+          total_results: recommendations.length,
         },
-        algorithm: 'Linear Combination (Vector Fusion)',
-        target_vector: fusionVector,
-      },
-      data: recommendations.map((res) => ({
-        title: res.movie.title,
-        genres: res.movie.genres,
-        similarity_score: res.score.toFixed(4),
-        poster: res.movie.posterUrl,
-        vector: res.movie.vector,
-        math_explanation: `Film ini ${res.score.toFixed(
-          4,
-        )} mirip dengan hasil "fusion" ${titleA} & ${titleB}.`,
-      })),
-    };
+        data: recommendations.map((res) => ({
+          title: res.movie.title,
+          genres: res.movie.genres,
+          similarity_score: res.score.toFixed(4),
+          poster: res.movie.posterUrl,
+          vector: res.movie.vector,
+          math_explanation: `Film ini ${res.score.toFixed(
+            4,
+          )} mirip dengan hasil "fusion" ${titleA} & ${titleB}.`,
+        })),
+      };
+    } catch (error) {
+      if (error.message.includes('tidak ditemukan')) {
+        throw new BadRequestException({
+          message: error.message,
+          error: 'MOVIE_NOT_FOUND',
+        });
+      }
+      throw new InternalServerErrorException({
+        message: 'Error memproses fusion',
+        error: 'FUSION_PROCESSING_ERROR',
+      });
+    }
   }
 }

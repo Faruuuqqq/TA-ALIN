@@ -22,17 +22,23 @@ function App() {
   const [queryTitle, setQueryTitle] = useState('');
   const [moodWeights, setMoodWeights] = useState<Record<string, number>>({});
   
-  // --- State untuk Fitur Fusion ---
-  const [fusionTitleA, setFusionTitleA] = useState('');
-  const [fusionTitleB, setFusionTitleB] = useState('');
-  const [fusionRatio, setFusionRatio] = useState(0.5);
-  // --------------------------------
+   // --- State untuk Fitur Fusion ---
+   const [fusionTitleA, setFusionTitleA] = useState('');
+   const [fusionTitleB, setFusionTitleB] = useState('');
+   const [fusionRatio, setFusionRatio] = useState(0.5);
+   // --------------------------------
 
-  // State Output
-  const [recommendations, setRecommendations] = useState<Movie[]>([]);
-  const [targetVector, setTargetVector] = useState<number[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+    // State untuk Metric Selection
+    const [metric, setMetric] = useState<'cosine' | 'euclidean' | 'manhattan'>('cosine');
+
+    // State untuk Pagination
+    const [resultsPerPage, setResultsPerPage] = useState(9);
+
+   // State Output
+   const [recommendations, setRecommendations] = useState<Movie[]>([]);
+   const [targetVector, setTargetVector] = useState<number[]>([]);
+   const [loading, setLoading] = useState(false);
+   const [error, setError] = useState('');
 
   useEffect(() => {
     // Clear recommendations when mode changes
@@ -45,31 +51,31 @@ function App() {
       .catch(() => setError('Tidak dapat memuat daftar genre dari server.'));
   }, []);
 
-  const handleSearch = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      let url = '';
-      if (mode === 'title') {
-        if (!queryTitle) {
-          setLoading(false);
-          return;
-        }
-        url = `http://localhost:3000/recommend?title=${encodeURIComponent(queryTitle)}`;
-      } else { // mode === 'mood'
-        if (Object.keys(moodWeights).length === 0) {
-          setLoading(false);
-          return;
-        }
-        const jsonWeights = JSON.stringify(moodWeights);
-        url = `http://localhost:3000/recommend/mood?weights=${jsonWeights}`;
-      }
+   const handleSearch = async () => {
+     setLoading(true);
+     setError('');
+     try {
+       let url = '';
+       if (mode === 'title') {
+         if (!queryTitle.trim()) {
+           setLoading(false);
+           return;
+         }
+         url = `http://localhost:3000/recommend?title=${encodeURIComponent(queryTitle.trim())}&metric=${metric}&limit=${resultsPerPage}`;
+       } else { // mode === 'mood'
+         if (Object.keys(moodWeights).length === 0) {
+           setLoading(false);
+           return;
+         }
+         const jsonWeights = JSON.stringify(moodWeights);
+         url = `http://localhost:3000/recommend/mood?weights=${encodeURIComponent(jsonWeights)}&metric=${metric}&limit=${resultsPerPage}`;
+       }
 
       const response = await axios.get(url);
 
       if (!response.data.data || response.data.data.length === 0) {
         setError(mode === 'title' 
-          ? `Film dengan judul "${queryTitle}" tidak ditemukan.`
+          ? `Film dengan judul "${queryTitle}" tidak ditemukan di database.`
           : 'Tidak ada film yang cocok dengan mood yang dipilih.'
         );
         setRecommendations([]);
@@ -80,37 +86,72 @@ function App() {
           const tempVector = availableGenres.map(g => moodWeights[g] || 0);
           setTargetVector(tempVector);
         } else {
-          setTargetVector(response.data.data[0]?.vector || []);
+          setTargetVector(response.data.meta?.target_vector || response.data.data[0]?.vector || []);
         }
       }
-    } catch (err) {
-      setError('Terjadi kesalahan saat mengambil data dari server.');
+    } catch (err: any) {
+      // Handle different error types
+      if (err.response?.status === 400) {
+        const errorMsg = err.response.data?.message || 'Permintaan tidak valid';
+        setError(errorMsg);
+      } else if (err.response?.status === 500) {
+        setError('Terjadi kesalahan di server. Silakan coba lagi.');
+      } else if (err.code === 'ERR_NETWORK') {
+        setError('Tidak dapat terhubung ke server. Pastikan server berjalan di http://localhost:3000');
+      } else {
+        setError('Terjadi kesalahan saat mengambil data dari server.');
+      }
+      console.error('Search error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFusionSearch = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await axios.post(
-        'http://localhost:3000/recommend/fusion',
-        {
-          titleA: fusionTitleA,
-          titleB: fusionTitleB,
-          ratio: fusionRatio,
-        },
-      );
+   const handleFusionSearch = async () => {
+     setLoading(true);
+     setError('');
+     try {
+       if (!fusionTitleA.trim() || !fusionTitleB.trim()) {
+         setError('Mohon masukkan kedua judul film.');
+         setLoading(false);
+         return;
+       }
+
+       const response = await axios.post(
+         'http://localhost:3000/recommend/fusion',
+         {
+           titleA: fusionTitleA.trim(),
+           titleB: fusionTitleB.trim(),
+           ratio: parseFloat(fusionRatio.toString()),
+           limit: resultsPerPage,
+         },
+         {
+           headers: {
+             'Content-Type': 'application/json',
+           },
+         }
+       );
+      
       if (!response.data.data || response.data.data.length === 0) {
-        setError('Tidak ada hasil fusion yang cocok.');
+        setError('Tidak ada hasil fusion yang cocok. Pastikan kedua film ada di database.');
         setRecommendations([]);
       } else {
         setRecommendations(response.data.data);
-        setTargetVector(response.data.meta.target_vector);
+        setTargetVector(response.data.meta?.target_vector || []);
       }
-    } catch (err) {
-      setError('Gagal mengambil data fusion dari server.');
+    } catch (err: any) {
+      // Handle different error types
+      if (err.response?.status === 400) {
+        const errorMsg = err.response.data?.message || 'Permintaan tidak valid';
+        setError(errorMsg);
+      } else if (err.response?.status === 500) {
+        setError('Terjadi kesalahan di server. Silakan coba lagi.');
+      } else if (err.code === 'ERR_NETWORK') {
+        setError('Tidak dapat terhubung ke server. Pastikan server berjalan di http://localhost:3000');
+      } else {
+        setError('Gagal mengambil data fusion dari server.');
+      }
+      console.error('Fusion error:', err);
     } finally {
       setLoading(false);
     }
@@ -140,6 +181,12 @@ function App() {
         fusionRatio={fusionRatio}
         setFusionRatio={setFusionRatio}
         onFusionSearch={handleFusionSearch}
+        // Metric Props
+        metric={metric}
+        onMetricChange={setMetric}
+        // Pagination Props
+        resultsPerPage={resultsPerPage}
+        onResultsPerPageChange={setResultsPerPage}
       />
 
       {recommendations.length > 0 ? (
@@ -149,8 +196,8 @@ function App() {
               key={`${movie.id}-${index}`}
               movie={movie}
               allGenres={availableGenres}
-              targetGenres={mode === 'mood' ? Object.keys(moodWeights) : []}
               targetVector={targetVector}
+              metric={metric}
             />
           ))}
         </div>
