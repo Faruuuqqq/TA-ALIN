@@ -1,0 +1,32 @@
+/* src/index.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  --bg-deep: #0f172a;       /* Background utama lebih gelap */
+  --bg-card: #1e293b;       /* Kartu sedikit lebih terang */
+  --primary: #6366f1;       /* Warna Utama (Indigo) */
+  --primary-hover: #4f46e5;
+  --accent: #14b8a6;        /* Warna Aksen (Teal) */
+  --text-main: #f8fafc;     /* Putih terang */
+  --text-muted: #94a3b8;    /* Abu-abu teks sekunder */
+  --glass: rgba(30, 41, 59, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --radius: 16px;           /* Konsistensi radius sudut */
+}
+
+* {
+  box-sizing: border-box; /* Penting biar padding gak ngerusak ukuran */
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-deep);
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.08), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(20, 184, 166, 0.08), transparent 25%);
+  color: var(--text-main);
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
