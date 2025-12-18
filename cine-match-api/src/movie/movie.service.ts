@@ -95,98 +95,111 @@ export class MovieService implements OnModuleInit {
         .on('data', (row) => {
           rowCount++;
 
-         try {
-             // --- LOGIKA FILTER & CLEANING ---
+          try {
+            // --- LOGIKA FILTER & CLEANING ---
 
-             // 1. Ambil Vote Count dengan case-insensitive header handling
-             const voteVal = row['vote_count'] ?? row['Vote_Count'] ?? row['voteCount'] ?? '0';
-             const voteCount = parseInt(String(voteVal).trim());
+            // 1. Ambil Vote Count dengan case-insensitive header handling
+            const voteVal =
+              row['vote_count'] ?? row['Vote_Count'] ?? row['voteCount'] ?? '0';
+            const voteCount = parseInt(String(voteVal).trim());
 
-             // Filter: Hanya ambil film yang cukup populer (Vote > 100)
-             if (isNaN(voteCount) || voteCount < 100) return;
+            // Filter: Hanya ambil film yang cukup populer (Vote > 100)
+            if (isNaN(voteCount) || voteCount < 100) return;
 
-             // 2. Ambil Genre - REQUIRED FIELD (case-insensitive)
-             const genreRaw = row['genres'] ?? row['Genres'];
-             if (!genreRaw || String(genreRaw).trim() === '') {
-               console.warn(
-                 `⚠️  Row ${rowCount}: Missing or empty genres field, skipping.`,
-               );
-               errorCount++;
-               return;
-             }
+            // 2. Ambil Genre - REQUIRED FIELD (case-insensitive)
+            const genreRaw = row['genres'] ?? row['Genres'];
+            if (!genreRaw || String(genreRaw).trim() === '') {
+              console.warn(
+                `⚠️  Row ${rowCount}: Missing or empty genres field, skipping.`,
+              );
+              errorCount++;
+              return;
+            }
 
-             // 3. Ambil Title & Overview - REQUIRED FIELDS (case-insensitive)
-             const title = row['title'] ?? row['Title'];
-             const overview = row['overview'] ?? row['Overview'];
+            // 3. Ambil Title & Overview - REQUIRED FIELDS (case-insensitive)
+            const title = row['title'] ?? row['Title'];
+            const overview = row['overview'] ?? row['Overview'];
 
-             if (!title || !overview) {
-               console.warn(
-                 `⚠️  Row ${rowCount}: Missing title or overview, skipping.`,
-               );
-               errorCount++;
-               return;
-             }
+            if (!title || !overview) {
+              console.warn(
+                `⚠️  Row ${rowCount}: Missing title or overview, skipping.`,
+              );
+              errorCount++;
+              return;
+            }
 
-             // Validasi title & overview not empty
-             if (String(title).trim() === '' || String(overview).trim() === '') {
-               console.warn(
-                 `⚠️  Row ${rowCount}: Empty title or overview, skipping.`,
-               );
-               errorCount++;
-               return;
-             }
+            // Validasi title & overview not empty
+            if (String(title).trim() === '' || String(overview).trim() === '') {
+              console.warn(
+                `⚠️  Row ${rowCount}: Empty title or overview, skipping.`,
+              );
+              errorCount++;
+              return;
+            }
 
-             // --- PROCESSING ---
-             // Split genre pakai strip (-) sesuai dataset baru
-             const genres = String(genreRaw)
-               .split('-')
-               .map((g: string) => g.trim())
-               .filter((g: string) => g.length > 0);
+            // --- PROCESSING ---
+            // Split genre pakai strip (-) sesuai dataset baru
+            const genres = String(genreRaw)
+              .split('-')
+              .map((g: string) => g.trim())
+              .filter((g: string) => g.length > 0);
 
-             if (genres.length === 0) {
-               console.warn(`⚠️  Row ${rowCount}: No valid genres found, skipping.`);
-               errorCount++;
-               return;
-             }
+            if (genres.length === 0) {
+              console.warn(
+                `⚠️  Row ${rowCount}: No valid genres found, skipping.`,
+              );
+              errorCount++;
+              return;
+            }
 
-             // Ambil keywords (case-insensitive)
-             const keywordRaw = row['keywords'] ?? row['Keywords'] ?? '';
-             const keywords = keywordRaw
-               ? String(keywordRaw).split('-').map((k: string) => k.trim())
-               : [];
+            // Ambil keywords (case-insensitive)
+            const keywordRaw = row['keywords'] ?? row['Keywords'] ?? '';
+            const keywords = keywordRaw
+              ? String(keywordRaw)
+                  .split('-')
+                  .map((k: string) => k.trim())
+              : [];
 
-             // Tambahkan ke Set unik
-             genres.forEach((g: string) => uniqueGenres.add(g));
+            // Tambahkan ke Set unik
+            genres.forEach((g: string) => uniqueGenres.add(g));
 
-             // Ambil Poster Path (case-insensitive)
-             const posterPath = row['poster_path'] ?? row['Poster_Path'] ?? row['posterPath'] ?? '';
+            // Ambil Poster Path (case-insensitive)
+            const posterPath =
+              row['poster_path'] ??
+              row['Poster_Path'] ??
+              row['posterPath'] ??
+              '';
 
-             // Ambil Rating - VALIDASI (case-insensitive)
-             const ratingVal = row['vote_average'] ?? row['Vote_Average'] ?? row['voteAverage'] ?? '0';
-             const rating = parseFloat(String(ratingVal)) || 0;
+            // Ambil Rating - VALIDASI (case-insensitive)
+            const ratingVal =
+              row['vote_average'] ??
+              row['Vote_Average'] ??
+              row['voteAverage'] ??
+              '0';
+            const rating = parseFloat(String(ratingVal)) || 0;
 
-             if (rating < 0 || rating > 10) {
-               console.warn(
-                 `⚠️  Row ${rowCount}: Invalid rating value ${rating}, using 0.`,
-               );
-             }
+            if (rating < 0 || rating > 10) {
+              console.warn(
+                `⚠️  Row ${rowCount}: Invalid rating value ${rating}, using 0.`,
+              );
+            }
 
-             rawData.push({
-               id: row['id'] || rowCount, // Fallback ke row number jika no ID
-               title: String(title).trim(),
-               overview: String(overview).trim(),
-               posterUrl: posterPath ? this.TMDB_BASE_URL + posterPath : '',
-               genres: genres,
-               keywords: keywords,
-               rating: Math.min(10, Math.max(0, rating)), // Clamp to 0-10
-             });
-           } catch (error) {
-             console.error(
-               `❌ Row ${rowCount}: Error processing row:`,
-               error instanceof Error ? error.message : String(error),
-             );
-             errorCount++;
-           }
+            rawData.push({
+              id: row['id'] || rowCount, // Fallback ke row number jika no ID
+              title: String(title).trim(),
+              overview: String(overview).trim(),
+              posterUrl: posterPath ? this.TMDB_BASE_URL + posterPath : '',
+              genres: genres,
+              keywords: keywords,
+              rating: Math.min(10, Math.max(0, rating)), // Clamp to 0-10
+            });
+          } catch (error) {
+            console.error(
+              `❌ Row ${rowCount}: Error processing row:`,
+              error instanceof Error ? error.message : String(error),
+            );
+            errorCount++;
+          }
         })
         .on('end', () => {
           // ✅ CHECK 3: Validasi data loaded
@@ -207,9 +220,7 @@ export class MovieService implements OnModuleInit {
           this.genreDimensions = Array.from(uniqueGenres).sort();
 
           if (this.genreDimensions.length === 0) {
-            return reject(
-              new Error('❌ No genres found in dataset.'),
-            );
+            return reject(new Error('❌ No genres found in dataset.'));
           }
 
           // Vektorisasi Akhir
@@ -234,9 +245,7 @@ export class MovieService implements OnModuleInit {
       // ✅ CHECK 4: Stream error handling
       stream.on('error', (error: Error) => {
         reject(
-          new Error(
-            `❌ Stream error while reading dataset: ${error.message}`,
-          ),
+          new Error(`❌ Stream error while reading dataset: ${error.message}`),
         );
       });
     });
