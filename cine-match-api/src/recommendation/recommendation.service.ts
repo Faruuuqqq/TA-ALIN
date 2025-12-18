@@ -2,6 +2,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { MovieService } from '../movie/movie.service';
 import { LinearAlgebraService } from '../math/linear-algebra.service';
+import { SimilarityCalculatorService, SimilarityMetric } from './similarity-calculator.service';
 import { Movie } from '../movie/movie.interface';
 
 // Interface untuk output hasil rekomendasi
@@ -15,6 +16,7 @@ export class RecommendationService {
   constructor(
     private readonly movieService: MovieService,
     private readonly mathService: LinearAlgebraService,
+    private readonly similarityCalculator: SimilarityCalculatorService,
   ) {}
 
   /**
@@ -23,7 +25,7 @@ export class RecommendationService {
   recommend(
     targetTitle: string,
     limit: number = 12,
-    metric: 'cosine' | 'euclidean' | 'manhattan' = 'cosine',
+    metric: SimilarityMetric = 'cosine',
   ): RecommendationResult[] {
     // 1. Ambil semua data film
     const allMovies = this.movieService.getMovies();
@@ -42,44 +44,23 @@ export class RecommendationService {
     console.log(`🔎 Mencari rekomendasi untuk: ${targetMovie.title}`);
     console.log(`   Vektor Target: [${targetMovie.vector.join(', ')}]`);
 
-    // 3. HITUNG SIMILARITY (Looping ke semua film)
-    // Ini penerapan Aljabar Linear: Membandingkan satu vektor dengan n vektor lainnya
+    // 3. HITUNG SIMILARITY menggunakan SimilarityCalculatorService
     const scoredMovies = allMovies
       .filter((m) => m.id !== targetMovie.id) // Jangan bandingkan dengan diri sendiri
       .map((movie) => {
-        let score = 0;
-
-        // Pilih Rumus Sesuai Request
-        if (metric === 'euclidean') {
-          // Untuk distance, semakin kecil semakin bagus.
-          // Biar sorting-nya gampang (descending), kita balik nilainya: 1 / (1 + distance)
-          const dist = this.mathService.euclideanDistance(
-            targetMovie.vector,
-            movie.vector,
-          );
-          score = 1 / (1 + dist);
-        } else if (metric === 'manhattan') {
-          const dist = this.mathService.manhattanDistance(
-            targetMovie.vector,
-            movie.vector,
-          );
-          score = 1 / (1 + dist);
-        } else {
-          // Default: Cosine Similarity
-          score = this.mathService.cosineSimilarity(
-            targetMovie.vector,
-            movie.vector,
-          );
-        }
+        const similarityResult = this.similarityCalculator.calculateSimilarity(
+          targetMovie.vector,
+          movie.vector,
+          metric,
+        );
 
         return {
           movie: movie,
-          score: score,
+          score: similarityResult.score,
         };
       });
 
     // 4. SORTING / RANKING
-    // Urutkan dari score terbesar (paling mirip) ke terkecil
     scoredMovies.sort((a, b) => b.score - a.score);
 
     // 5. Ambil Top N
@@ -89,7 +70,7 @@ export class RecommendationService {
   recommendByGenres(
     genreWeights: Record<string, number>,
     limit: number = 20,
-    metric: 'cosine' | 'euclidean' | 'manhattan' = 'cosine',
+    metric: SimilarityMetric = 'cosine',
   ): { recommendations: RecommendationResult[]; queryVector: number[] } {
     // Panggil fungsi createWeightedVector yang baru kita buat
     const queryVector = this.movieService.createWeightedVector(genreWeights);
@@ -100,29 +81,13 @@ export class RecommendationService {
 
     const scoredMovies = allMovies
       .map((movie) => {
-        let score = 0;
+        const similarityResult = this.similarityCalculator.calculateSimilarity(
+          queryVector,
+          movie.vector,
+          metric,
+        );
 
-        // Pilih Rumus Sesuai Request
-        if (metric === 'euclidean') {
-          // Untuk distance, semakin kecil semakin bagus.
-          // Biar sorting-nya gampang (descending), kita balik nilainya: 1 / (1 + distance)
-          const dist = this.mathService.euclideanDistance(
-            queryVector,
-            movie.vector,
-          );
-          score = 1 / (1 + dist);
-        } else if (metric === 'manhattan') {
-          const dist = this.mathService.manhattanDistance(
-            queryVector,
-            movie.vector,
-          );
-          score = 1 / (1 + dist);
-        } else {
-          // Default: Cosine Similarity
-          score = this.mathService.cosineSimilarity(queryVector, movie.vector);
-        }
-
-        return { movie, score };
+        return { movie, score: similarityResult.score };
       })
       .sort((a, b) => b.score - a.score);
 
@@ -135,95 +100,107 @@ export class RecommendationService {
   /**
    * FITUR BARU: Rekomendasi berdasarkan kumpulan film (Centroid)
    */
-  recommendByTasteProfile(
-    movieIds: number[],
-    limit: number = 12,
-  ): RecommendationResult[] {
-    const allMovies = this.movieService.getMovies();
+   recommendByTasteProfile(
+     movieIds: number[],
+     limit: number = 12,
+     metric: SimilarityMetric = 'cosine',
+   ): RecommendationResult[] {
+     const allMovies = this.movieService.getMovies();
 
-    // 1. Ambil object film berdasarkan ID yang dikirim
-    const selectedMovies = allMovies.filter((m) => movieIds.includes(m.id));
+     // 1. Ambil object film berdasarkan ID yang dikirim
+     const selectedMovies = allMovies.filter((m) => movieIds.includes(m.id));
 
-    if (selectedMovies.length === 0) {
-      throw new Error('Tidak ada film yang dipilih valid.');
-    }
+     if (selectedMovies.length === 0) {
+       throw new Error('Tidak ada film yang dipilih valid.');
+     }
 
-    console.log(`🧠 Menganalisis selera dari ${selectedMovies.length} film...`);
+     // Validasi bahwa semua film punya dimensi vektor yang sama
+     const firstDim = selectedMovies[0].vector.length;
+     const allSameDimension = selectedMovies.every((m) => m.vector.length === firstDim);
+     
+     if (!allSameDimension) {
+       throw new Error('Vector dimensions mismatch dalam selected movies.');
+     }
 
-    // 2. HITUNG CENTROID (RATA-RATA VEKTOR)
-    const dimensions = selectedMovies[0].vector.length;
-    const centroidVector = new Array(dimensions).fill(0);
+     console.log(`🧠 Menganalisis selera dari ${selectedMovies.length} film...`);
 
-    // Penjumlahan Vektor (Vector Addition)
-    selectedMovies.forEach((movie) => {
-      movie.vector.forEach((val, i) => {
-        centroidVector[i] += val;
-      });
-    });
+     // 2. HITUNG CENTROID (RATA-RATA VEKTOR)
+     const dimensions = firstDim;
+     const centroidVector = new Array(dimensions).fill(0);
 
-    // Pembagian Skalar (Scalar Division)
-    // Rata-rata = Total / Jumlah Film
-    const averageVector = centroidVector.map(
-      (val) => val / selectedMovies.length,
-    );
+     // Penjumlahan Vektor (Vector Addition)
+     selectedMovies.forEach((movie) => {
+       movie.vector.forEach((val, i) => {
+         centroidVector[i] += val;
+       });
+     });
 
-    // 3. Cari film terdekat dengan Centroid
-    const scoredMovies = allMovies
-      // Filter: Jangan rekomendasikan film yang sudah dipilih user (kan udah nonton)
-      .filter((m) => !movieIds.includes(m.id))
-      .map((movie) => {
-        const score = this.mathService.cosineSimilarity(
-          averageVector,
-          movie.vector,
-        );
-        return { movie, score };
-      })
-      .sort((a, b) => b.score - a.score);
+     // Pembagian Skalar (Scalar Division)
+     // Rata-rata = Total / Jumlah Film
+     const averageVector = centroidVector.map(
+       (val) => val / selectedMovies.length,
+     );
 
-    return scoredMovies.slice(0, limit);
-  }
+     // 3. Cari film terdekat dengan Centroid menggunakan SimilarityCalculatorService
+     const scoredMovies = allMovies
+       // Filter: Jangan rekomendasikan film yang sudah dipilih user (kan udah nonton)
+       .filter((m) => !movieIds.includes(m.id))
+       .map((movie) => {
+         const similarityResult = this.similarityCalculator.calculateSimilarity(
+           averageVector,
+           movie.vector,
+           metric,
+         );
+         return { movie, score: similarityResult.score };
+       })
+       .sort((a, b) => b.score - a.score);
 
-  recommendByFusion(
-    titleA: string,
-    titleB: string,
-    ratio: number,
-    limit: number = 12,
-  ): { recommendations: RecommendationResult[]; fusionVector: number[] } {
-    const allMovies = this.movieService.getMovies();
+     return scoredMovies.slice(0, limit);
+   }
 
-    const movieA = allMovies.find(
-      (m) => m.title.toLowerCase() === titleA.toLowerCase(),
-    );
-    const movieB = allMovies.find(
-      (m) => m.title.toLowerCase() === titleB.toLowerCase(),
-    );
+   recommendByFusion(
+     titleA: string,
+     titleB: string,
+     ratio: number,
+     limit: number = 12,
+     metric: SimilarityMetric = 'cosine',
+   ): { recommendations: RecommendationResult[]; fusionVector: number[] } {
+     const allMovies = this.movieService.getMovies();
 
-    if (!movieA || !movieB) {
-      throw new NotFoundException(
-        'Salah satu atau kedua film tidak ditemukan.',
-      );
-    }
+     const movieA = allMovies.find(
+       (m) => m.title.toLowerCase() === titleA.toLowerCase(),
+     );
+     const movieB = allMovies.find(
+       (m) => m.title.toLowerCase() === titleB.toLowerCase(),
+     );
 
-    // 1. Hitung Vektor Campuran (Linear Combination)
-    const fusionVector = movieA.vector.map((val, i) => {
-      return val * ratio + movieB.vector[i] * (1 - ratio);
-    });
+     if (!movieA || !movieB) {
+       throw new NotFoundException(
+         'Salah satu atau kedua film tidak ditemukan.',
+       );
+     }
 
-    // 2. Cari film yang paling mirip dengan fusionVector
-    const scoredMovies = allMovies
-      .filter((m) => m.id !== movieA.id && m.id !== movieB.id) // Exclude the source movies
-      .map((movie) => {
-        const score = this.mathService.cosineSimilarity(
-          fusionVector,
-          movie.vector,
-        );
-        return { movie, score };
-      })
-      .sort((a, b) => b.score - a.score);
+     // 1. Hitung Vektor Campuran (Linear Combination)
+     const fusionVector = movieA.vector.map((val, i) => {
+       return val * ratio + movieB.vector[i] * (1 - ratio);
+     });
 
-    return {
-      recommendations: scoredMovies.slice(0, limit),
-      fusionVector,
-    };
-  }
+     // 2. Cari film yang paling mirip dengan fusionVector menggunakan SimilarityCalculatorService
+     const scoredMovies = allMovies
+       .filter((m) => m.id !== movieA.id && m.id !== movieB.id) // Exclude the source movies
+       .map((movie) => {
+         const similarityResult = this.similarityCalculator.calculateSimilarity(
+           fusionVector,
+           movie.vector,
+           metric,
+         );
+         return { movie, score: similarityResult.score };
+       })
+       .sort((a, b) => b.score - a.score);
+
+     return {
+       recommendations: scoredMovies.slice(0, limit),
+       fusionVector,
+     };
+   }
 }

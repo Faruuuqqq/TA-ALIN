@@ -1,0 +1,181 @@
+================================================================================
+CINEMATCH CODE AUDIT - ISSUES TABLE
+================================================================================
+Date: December 18, 2025 | Total Issues: 22 | Status: COMPLETED
+
+================================================================================
+CRITICAL ISSUES (4) - MUST FIX IMMEDIATELY
+================================================================================
+
+ID  Severity   Title                              File                         Lines    Fix Time
+──  ─────────  ──────────────────────────────────  ───────────────────────────  ───────  ────────
+1   CRITICAL   Movie Interface Duplication         movie.interface.ts           1-9      1 hour
+                                                   movie.service.ts             6-15
+    
+2   CRITICAL   Duplicate Similarity Logic (4x)     recommendation.service.ts    47-79    2-3 hours
+                                                   recommendation.service.ts    101-127
+                                                   recommendation.service.ts    170-181
+                                                   MathModal.tsx                44-57
+
+3   CRITICAL   Unsafe CSV Loading                  movie.service.ts             79-145   2-3 hours
+    
+4   CRITICAL   Missing Input Validation            app.controller.ts            89, 175  2-3 hours
+
+SUBTOTAL: 7-10 hours
+
+================================================================================
+HIGH ISSUES (6) - PRIORITY FIX
+================================================================================
+
+ID  Severity   Title                              File                         Lines    Fix Time
+──  ─────────  ──────────────────────────────────  ───────────────────────────  ───────  ────────
+5   HIGH       Duplicate Validation (3x)          app.controller.ts            26, 86   1-2 hours
+                                                                                190
+
+6   HIGH       Hardcoded API URLs (5x)            App.tsx                      49, 64   1-2 hours
+                                                                                71, 120
+                                                                                150
+
+7   HIGH       Type Inconsistency                 interfaces.ts                1-11     1-2 hours
+    
+8   HIGH       Performance: O(n²) Algorithm       recommendation.service.ts    47-79    3-4 hours
+    
+9   HIGH       Inconsistent Exception Types       recommendation.service.ts    37-39    1-2 hours
+                                                                                147-149
+                                                                                201-204
+
+10  HIGH       Inefficient Calculations           MathModal.tsx                215-246  1-2 hours
+
+SUBTOTAL: 8-12 hours
+
+================================================================================
+MEDIUM ISSUES (5) - SHOULD FIX SOON
+================================================================================
+
+ID  Severity   Title                              File                         Lines    Fix Time
+──  ─────────  ──────────────────────────────────  ───────────────────────────  ───────  ────────
+11  MEDIUM     Inefficient Movie Filtering        movie.service.ts             82-110   1-2 hours
+    
+12  MEDIUM     Unused State in Context            AppContext.tsx               63       30 min
+    
+13  MEDIUM     Missing Null/Undefined Checks      MovieCard.tsx                22-23    1 hour
+                                                                                31
+
+14  MEDIUM     Inefficient State Management       App.tsx                      17-41    2-3 hours
+    
+15  MEDIUM     Unsafe Arithmetic Operations       MathModal.tsx                154      30 min
+
+SUBTOTAL: 5-7 hours
+
+================================================================================
+LOW ISSUES (7) - BEST PRACTICES
+================================================================================
+
+ID  Severity   Title                              File                         Lines    Fix Time
+──  ─────────  ──────────────────────────────────  ───────────────────────────  ───────  ────────
+16  LOW        Hardcoded Magic Numbers            Multiple                     Various  1-2 hours
+    
+17  LOW        Missing Documentation (JSDoc)      All service files            Various  2-3 hours
+    
+18  LOW        Unused Service                     app.service.ts               1-8      30 min
+    
+19  LOW        Inconsistent Naming Convention     Multiple                     Various  1-2 hours
+    
+20  LOW        Missing Test Coverage              All                          Various  5-8 hours
+    
+21  LOW        DEPRECATED (No longer used)
+    
+22  LOW        DEPRECATED (No longer used)
+
+SUBTOTAL: 10-16 hours
+
+================================================================================
+SUMMARY BY IMPACT AREA
+================================================================================
+
+Code Quality Issues (DRY Violations):
+  - Issue #2: 4x similar code duplication
+  - Issue #5: 3x validation code duplication
+  - Combined: 7 instances of copy-paste code
+
+Type Safety Issues:
+  - Issue #1: Duplicate interface definitions
+  - Issue #7: Inconsistent type definitions
+  - Issue #13: Missing null checks
+  - Total: 3 type-related issues
+
+Error Handling Issues:
+  - Issue #3: Silent failures
+  - Issue #4: Missing validation
+  - Issue #9: Inconsistent exceptions
+  - Total: 3 error handling issues
+
+Performance Issues:
+  - Issue #8: O(n²) complexity
+  - Issue #10: Inefficient calculations
+  - Issue #11: Inefficient filtering
+  - Total: 3 performance issues
+
+Configuration Issues:
+  - Issue #6: Hardcoded URLs
+  - Issue #16: Magic numbers
+  - Total: 2 configuration issues
+
+Documentation Issues:
+  - Issue #17: Missing JSDoc
+  - Issue #20: Missing tests
+  - Total: 2 documentation issues
+
+================================================================================
+TIMELINE SUMMARY
+================================================================================
+
+Total Estimated Hours:     37-58 hours
+Total Estimated Days:      5-7 developer days
+Total Estimated Weeks:     1-2 weeks (with peer review and testing)
+
+Breakdown by Phase:
+  Phase 1 (Critical):      7-10 hours   (Week 1, Days 1-4)
+  Phase 2 (High):          8-12 hours   (Week 1-2, Days 2-5)
+  Phase 3 (Medium):        5-7 hours    (Week 2, Days 3-5)
+  Phase 4 (Low):           10-16 hours  (Week 2-3, ongoing)
+  Review & Testing:        5-10 hours   (Ongoing)
+  Documentation:           2-3 hours    (Week 3)
+
+================================================================================
+PRIORITY MATRIX
+================================================================================
+
+High Severity + High Effort:
+  → Issue #8: O(n²) Performance (3-4 hours) - Consider for sprint planning
+  → Issue #2: 4x Duplication (2-3 hours) - High impact, good ROI
+  → Issue #3: CSV Loading (2-3 hours) - Critical for stability
+
+High Severity + Low Effort:
+  → Issue #5: 3x Validation (1-2 hours) - Quick win, easy fix
+  → Issue #6: Hardcoded URLs (1-2 hours) - Quick win, enables scaling
+  → Issue #1: Interface Duplication (1 hour) - Quick win, foundation fix
+
+Medium Severity + Low Effort:
+  → Issue #12: Unused State (30 min) - Easy cleanup
+  → Issue #15: Unsafe Math (30 min) - Easy fix
+  → Issue #13: Null Checks (1 hour) - Good practice
+
+================================================================================
+FILE LOCATIONS QUICK REFERENCE
+================================================================================
+
+BACKEND ISSUES:
+
+movie.interface.ts
+  ↳ Issue #1 (Lines 1-9): Duplicate interface definition
+
+movie.service.ts
+  ↳ Issue #3 (Lines 79-145): Unsafe CSV loading
+  ↳ Issue #11 (Lines 82-110): Inefficient filtering
+  ↳ Issue #16 (Line 90): Magic number (voteCount < 100)
+
+recommendation.service.ts
+  ↳ Issue #2 (Lines 47-79): Duplicate similarity calculation
+  ↳ Issue #4 (Lines 23-26, 139-141): Missing input validation
+  ↳ Issue #

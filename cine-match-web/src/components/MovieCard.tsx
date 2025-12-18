@@ -28,31 +28,34 @@ export const MovieCard = ({
         <div className="poster-wrapper">
           <div className="score-badge">{matchPercent}% Match</div>
           
-          {!imgError && (movie.poster || movie.posterUrl) ? (
-            <img 
-              src={movie.poster || movie.posterUrl} 
-              alt={movie.title}
-              className="poster-image"
-              onError={() => setImgError(true)}
-            />
-          ) : (
-            <div className="poster-fallback">
-              <div>
-                <span style={{fontSize:'3rem', display:'block', marginBottom:'10px'}}>🎬</span>
-                {movie.title}
-              </div>
-            </div>
-          )}
+           {!imgError && (movie.poster || movie.posterUrl) ? (
+             <img 
+               src={movie.poster || movie.posterUrl} 
+               alt={movie.title}
+               className="poster-image"
+               onError={() => setImgError(true)}
+             />
+           ) : (
+             <div className="poster-fallback">
+               <div>
+                 {movie.title}
+               </div>
+             </div>
+           )}
         </div>
         
         <div className="card-content">
-          <h3>{movie.title}</h3>
-          <p className="card-genres">{movie.genres.join(', ')}</p>
-          
-          <button className="btn-math" onClick={() => setShowMath(true)}>
-            ∑ Lihat Perhitungan
-          </button>
-        </div>
+           <h3>{movie.title}</h3>
+           <p className="card-genres">{movie.genres.join(', ')}</p>
+           
+           {movie.overview && (
+             <p className="card-overview">{movie.overview}</p>
+           )}
+           
+           <button className="btn-math" onClick={() => setShowMath(true)}>
+             Lihat Perhitungan
+           </button>
+         </div>
       </div>
 
       {/* MODAL PERHITUNGAN */}

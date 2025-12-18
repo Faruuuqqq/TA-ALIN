@@ -58,11 +58,11 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   
   return (
     <div className="controls-wrapper">
-      <div className="tabs">
-        <button className={mode === 'title' ? 'active' : ''} onClick={() => setMode('title')}>🔍 Cari Judul</button>
-        <button className={mode === 'mood' ? 'active' : ''} onClick={() => setMode('mood')}>🎭 Vektor Mood</button>
-        <button className={mode === 'fusion' ? 'active' : ''} onClick={() => setMode('fusion')}>🧬 Movie Fusion</button>
-      </div>
+       <div className="tabs">
+         <button className={mode === 'title' ? 'active' : ''} onClick={() => setMode('title')}>Cari Judul</button>
+         <button className={mode === 'mood' ? 'active' : ''} onClick={() => setMode('mood')}>Vektor Mood</button>
+         <button className={mode === 'fusion' ? 'active' : ''} onClick={() => setMode('fusion')}>Movie Fusion</button>
+       </div>
 
       {/* MODE TITLE */}
       {mode === 'title' && (
@@ -124,12 +124,12 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
 
               {/* LIVE VECTOR MONITOR */}
                <div style={{background: '#0f172a', padding: '15px', borderRadius: '10px', border: '1px solid #334155', marginTop: '20px', fontFamily: 'JetBrains Mono, monospace'}}>
-                 <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px'}}>
-                   <span style={{color:'#94a3b8', fontSize:'0.8rem'}}>🎯 Vektor Query (Q)</span>
-                   <button onClick={() => setIsVectorExpanded(!isVectorExpanded)} style={{background:'none', border:'none', color:'#6366f1', cursor:'pointer', fontSize:'0.8rem'}}>
-                     {isVectorExpanded ? 'Sembunyikan' : 'Lihat Detail'}
-                   </button>
-                 </div>
+                <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px'}}>
+                    <span style={{color:'#94a3b8', fontSize:'0.8rem'}}>Vektor Query (Q)</span>
+                    <button onClick={() => setIsVectorExpanded(!isVectorExpanded)} style={{background:'none', border:'none', color:'#6366f1', cursor:'pointer', fontSize:'0.8rem'}}>
+                      {isVectorExpanded ? 'Sembunyikan' : 'Lihat Detail'}
+                    </button>
+                  </div>
                 <div style={{display:'flex', gap:'8px', overflowX:'auto', paddingBottom:'5px'}}>
                    {(isVectorExpanded ? availableGenres : activeGenres).map(g => {
                      const val = moodWeights[g] || 0;
@@ -172,53 +172,51 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
             <input type="range" min="0" max="1" step="0.1" value={fusionRatio} onChange={(e) => setFusionRatio(parseFloat(e.target.value))} style={{width:'100%', accentColor:'white', cursor:'pointer'}} />
           </div>
            <div style={{textAlign: 'center'}}>
-            <button className="btn-primary" onClick={onFusionSearch} disabled={!fusionTitleA || !fusionTitleB} style={{background: 'linear-gradient(90deg, var(--primary), var(--accent))', border:'none'}}>
-              🧬 Lakukan Fusi Vektor
-            </button>
+             <button className="btn-primary" onClick={onFusionSearch} disabled={!fusionTitleA || !fusionTitleB} style={{background: 'linear-gradient(90deg, var(--primary), var(--accent))', border:'none'}}>
+               Lakukan Fusi Vektor
+             </button>
           </div>
         </div>
        )}
 
        {/* PAGINATION & METRIC CONTROLS */}
        <div className="controls-selector-group">
-         {/* PAGINATION SELECTOR */}
-         <div className="selector-item pagination-section">
-           <span className="selector-label pagination-icon">📄</span>
-           <span className="selector-label">Hasil per Halaman</span>
-           <div className="custom-select">
-             <select 
-               value={resultsPerPage} 
-               onChange={(e) => onResultsPerPageChange?.(parseInt(e.target.value, 10))}
-             >
-               <option value="3">3 Hasil</option>
-               <option value="6">6 Hasil</option>
-               <option value="9">9 Hasil</option>
-               <option value="12">12 Hasil</option>
-               <option value="15">15 Hasil</option>
-               <option value="21">21 Hasil</option>
-               <option value="30">30 Hasil</option>
-               <option value="50">50 Hasil</option>
-             </select>
-           </div>
-         </div>
+          {/* PAGINATION SELECTOR */}
+          <div className="selector-item pagination-section">
+            <span className="selector-label">Hasil per Halaman</span>
+            <div className="custom-select">
+              <select 
+                value={resultsPerPage} 
+                onChange={(e) => onResultsPerPageChange?.(parseInt(e.target.value, 10))}
+              >
+                <option value="4">4 Hasil</option>
+                <option value="8">8 Hasil</option>
+                <option value="12">12 Hasil</option>
+                <option value="16">16 Hasil</option>
+                <option value="20">20 Hasil</option>
+                <option value="24">24 Hasil</option>
+                <option value="28">28 Hasil</option>
+                <option value="32">32 Hasil</option>
+              </select>
+            </div>
+          </div>
 
-         {/* METRIC SELECTOR - only for non-fusion modes */}
-         {mode !== 'fusion' && (
-           <div className="selector-item metric-section">
-             <span className="selector-label metric-icon">📐</span>
-             <span className="selector-label">Metode Jarak</span>
-             <div className="custom-select">
-               <select 
-                 value={metric} 
-                 onChange={(e) => onMetricChange?.(e.target.value as any)}
-               >
-                 <option value="cosine">Cosine (Sudut)</option>
-                 <option value="euclidean">Euclidean (Garis)</option>
-                 <option value="manhattan">Manhattan (Grid)</option>
-               </select>
-             </div>
-           </div>
-         )}
+          {/* METRIC SELECTOR - only for non-fusion modes */}
+          {mode !== 'fusion' && (
+            <div className="selector-item metric-section">
+              <span className="selector-label">Metode Jarak</span>
+              <div className="custom-select">
+                <select 
+                  value={metric} 
+                  onChange={(e) => onMetricChange?.(e.target.value as any)}
+                >
+                  <option value="cosine">Cosine (Sudut)</option>
+                  <option value="euclidean">Euclidean (Garis)</option>
+                  <option value="manhattan">Manhattan (Grid)</option>
+                </select>
+              </div>
+            </div>
+          )}
        </div>
     </div>
   );

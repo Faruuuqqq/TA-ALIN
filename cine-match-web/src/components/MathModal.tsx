@@ -90,7 +90,7 @@ export const MathModal = ({
         {/* HEADER MODAL */}
         <div className="modal-header">
           <div>
-            <h2 style={{margin: 0, fontSize: '1.5rem', color: '#f8fafc'}}>📊 Analisis: {movieTitle}</h2>
+             <h2 style={{margin: 0, fontSize: '1.5rem', color: '#f8fafc'}}>Analisis: {movieTitle}</h2>
             <p style={{margin: '5px 0 0', color: '#94a3b8', fontSize: '0.9rem'}}>
               Metode: <strong style={{color: '#6366f1'}}>{metric.charAt(0).toUpperCase() + metric.slice(1)}</strong> | 
               Tingkat Kecocokan: <strong style={{color: '#14b8a6'}}>{finalScore}%</strong>
@@ -161,9 +161,9 @@ export const MathModal = ({
               {matchingGenres.length > 0 ? (
                 <div style={{display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px'}}>
                   {matchingGenres.map(g => (
-                    <span key={g} style={{background: '#14b8a6', color: '#0f172a', padding: '6px 14px', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', boxShadow: '0 2px 10px rgba(20, 184, 166, 0.2)'}}>
-                      ✅ {g}
-                    </span>
+                     <span key={g} style={{background: '#14b8a6', color: '#0f172a', padding: '6px 14px', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', boxShadow: '0 2px 10px rgba(20, 184, 166, 0.2)'}}>
+                       {g}
+                     </span>
                   ))}
                 </div>
               ) : (

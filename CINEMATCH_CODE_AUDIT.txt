@@ -1,0 +1,239 @@
+================================================================================
+COMPREHENSIVE CODE AUDIT REPORT - CINEMATCH PROJECT
+================================================================================
+
+Date: December 18, 2025
+Status: DETAILED ANALYSIS COMPLETED
+Severity Levels: CRITICAL | HIGH | MEDIUM | LOW
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+Audit menemukan 22 masalah teknis signifikan di backend dan frontend CineMatch:
+- 4 CRITICAL issues (harus diperbaiki segera)
+- 6 HIGH issues (mempengaruhi reliability)
+- 5 MEDIUM issues (mempengaruhi maintainability)
+- 7 LOW issues (best practices)
+
+Estimated fix effort: 20-25 developer days
+
+================================================================================
+CRITICAL ISSUES (SEVERITY: CRITICAL)
+================================================================================
+
+1. MOVIE INTERFACE DUPLICATION
+   Location:
+   - cine-match-api/src/movie/movie.interface.ts (Lines 1-9)
+   - cine-match-api/src/movie/movie.service.ts (Lines 6-15)
+   
+   Problem:
+   Interface Movie didefinisikan di 2 tempat dengan struktur BERBEDA:
+   - movie.interface.ts: id, title, overview, posterUrl, genres, vector
+   - movie.service.ts: TAMBAHAN keywords dan rating
+   
+   Impact:
+   - Type inconsistency di seluruh aplikasi
+   - Runtime type errors mungkin terjadi
+   - Maintenance nightmare jika salah satu berubah
+   
+   Fix:
+   Satu definisi terpusat dengan optional fields di shared location
+
+
+2. DUPLICATE SIMILARITY CALCULATION LOGIC (4x REPETITION)
+   Location:
+   - recommendation.service.ts: recommend() (Lines 47-79)
+   - recommendation.service.ts: recommendByGenres() (Lines 101-127)
+   - recommendation.service.ts: recommendByTasteProfile() (Lines 170-181)
+   - MathModal.tsx (Lines 44-57)
+   
+   Problem:
+   Logika metric calculation (cosine/euclidean/manhattan) DIULANG 4x:
+   
+   if (metric === 'euclidean') {
+     const dist = this.mathService.euclideanDistance(vecA, vecB);
+     score = 1 / (1 + dist);
+   } else if (metric === 'manhattan') {
+     const dist = this.mathService.manhattanDistance(vecA, vecB);
+     score = 1 / (1 + dist);
+   } else {
+     score = this.mathService.cosineSimilarity(vecA, vecB);
+   }
+   
+   Impact (CRITICAL):
+   - DRY Principle violation
+   - Bug fix harus dilakukan 4 kali = 4x risk of inconsistency
+   - Maintenance cost sangat tinggi
+   
+   Fix:
+   Extract ke utility service/function, gunakan di semua tempat
+
+
+3. UNSAFE CSV LOADING WITHOUT ERROR RECOVERY
+   Location:
+   cine-match-api/src/movie/movie.service.ts (Lines 79-145)
+   
+   Problem:
+   return new Promise((resolve, reject) => {
+     fs.createReadStream(csvFilePath)
+       .pipe(csv())
+       .on('data', (row) => {
+         // Multiple silent returns
+         if (isNaN(voteCount) || voteCount < 100) return;
+         if (!genreRaw) return;
+         if (!title || !overview) return;
+       })
+       .on('end', () => { resolve(true); })
+       .on('error', (error) => reject(error));
+   });
+   
+   Issues:
+   1. NO file existence check - jika CSV missing, app crashes saat startup
+   2. Silent failures - banyak return tanpa logging
+   3. NO validation recovery - jika CSV corrupted, total failure
+   4. Hardcoded filter (voteCount < 100) tidak configurable
+   5. Memory inefficient untuk large files
+   
+   Impact:
+   - Application crashes tanpa error message yang jelas
+   - Impossible to debug missing data
+   - No graceful degradation
+
+
+4. MISSING INPUT VALIDATION
+   Location:
+   - app.controller.ts (Lines 89, 175-180)
+   - recommendation.service.ts (Lines 23-26, 139-141)
+   
+   Problem:
+   const weights = JSON.parse(weightsParam);  // NO error handling
+   const { titleA, titleB, ratio, limit = 12 } = body;  // NO validation
+   
+   Issues:
+   1. SyntaxError dari JSON.parse bisa crash app
+   2. No validation untuk genre weights (bisa negative/string)
+   3. No type coercion/validation untuk ratio
+   4. No null/undefined checks
+   5. No sanitization untuk XSS prevention
+   
+   Impact:
+   - Invalid data masuk ke system
+   - Runtime errors tidak handled properly
+
+================================================================================
+HIGH SEVERITY ISSUES
+================================================================================
+
+5. HARDCODED VALIDATION LOGIC (DUPLICATION)
+   Location: app.controller.ts
+   - Line 26: const validLimit = Math.min(Math.max(parseInt(String(limit), 10) || 9, 1), 50);
+   - Line 86: const validLimit = Math.min(Math.max(parseInt(String(limit), 10) || 21, 1), 50);
+   - Line 190: const validLimit = Math.min(Math.max(parseInt(String(limit), 10) || 12, 1), 50);
+   
+   Issues:
+   1. EXACT DUPLIKASI 3x dengan default berbeda (9, 21, 12)
+   2. parseInt(String(limit), 10) redundant
+   3. No clear validation pattern
+
+
+6. INCONSISTENT ERROR HANDLING IN FRONTEND
+   Location: App.tsx (Lines 52-108, 110-158)
+   
+   Issues:
+   1. setLoading(false) dipanggil redundantly (Lines 61, 67)
+   2. Error handling logic di 3 tempat berbeda
+   3. Hardcoded API URL di 3 tempat (localhost:3000)
+   4. No response schema validation
+   5. Error messages tidak konsisten
+
+
+7. TYPE INCONSISTENCY IN INTERFACES
+   Location: src/interfaces.ts (Lines 1-11)
+   
+   export interface Movie {
+     id?: number;              // Optional (tapi always required dari backend)
+     title: string;
+     overview?: string;        // Optional
+     genres: string[];
+     poster: string;           //
+     posterUrl?: string;       // DUPLICATE dengan poster
+     vector: number[];
+     similarity_score: string; // WRONG - should be number!
+   }
+   
+   Issues:
+   1. similarity_score adalah string padahal seharusnya number
+   2. poster dan posterUrl - field duplikat, unclear
+   3. id optional padahal always required dari backend
+
+
+8. PERFORMANCE: O(n²) SIMILARITY CALCULATION
+   Location: recommendation.service.ts (Lines 47-79)
+   
+   Problem:
+   const scoredMovies = allMovies
+     .filter((m) => m.id !== targetMovie.id)
+     .map((movie) => {
+       const score = this.mathService.cosineSimilarity(targetMovie.vector, movie.vector);
+       return { movie, score };
+     })
+     .sort((a, b) => b.score - a.score);
+   
+   Issues:
+   1. No caching untuk popular queries
+   2. Dengan 1000+ movies, bisa sangat slow
+   3. Belum ada vector database indexing (FAISS, Milvus)
+   4. O(n*m + n log n) complexity
+
+
+9. INCONSISTENT EXCEPTION TYPES
+   Location: recommendation.service.ts
+   - Line 37-39: throw new NotFoundException()
+   - Line 147-149: throw new Error() [GENERIC]
+   - Line 201-204: throw new NotFoundException()
+   
+   Issues:
+   1. Mix antara NotFoundException dan generic Error
+   2. Tidak konsisten exception handling
+   3. Difficult to handle specific errors
+
+
+10. INEFFICIENT VECTOR CALCULATION IN FRONTEND
+    Location: MathModal.tsx (Lines 215-246)
+    
+    Issues:
+    1. Calculations dilakukan setiap render (tidak memoized)
+    2. O(n) filtering logic dalam JSX
+    3. Recalculated dot product, euclidean, manhattan setiap render
+    4. Conditional logic kompleks di dalam loop
+
+================================================================================
+MEDIUM SEVERITY ISSUES
+================================================================================
+
+11. INEFFICIENT MOVIE FILTERING LOGIC
+    Location: movie.service.ts (Lines 82-110)
+    
+    Problem:
+    .on('data', (row) => {
+      const voteVal = row.vote_count || row.Vote_Count || '0';
+      const voteCount = parseInt(voteVal);
+      if (isNaN(voteCount) || voteCount < 100) return;  // Check 1
+      
+      const genreRaw = row.genres || row.Genres;
+      if (!genreRaw) return;  // Check 2
+      
+      const title = row.title || row.Title;
+      const overview = row.overview || row.Overview;
+      if (!title || !overview) return;  // Check 3
+      
+      // ... more checks ...
+      
+      rawData.push({ ... });
+    })
+    
+    Issues:
+    1. 5 sequential checks sebelum data processing
+    2. Genre di-process sebelum semua validation selesai
+    3. Tidak optimal untuk
