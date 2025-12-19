@@ -6,6 +6,9 @@ import { ErrorNotification } from './components/ErrorNotification';
 import { useAppContext } from './context/AppContext';
 import './App.css';
 
+// Get API base URL from environment or use default
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
 function App() {
   // Gunakan context untuk state management
   const {
@@ -39,7 +42,7 @@ function App() {
 
   // Load genres on mount
   useEffect(() => {
-    axios.get('http://localhost:3000/genres')
+    axios.get(`${API_BASE_URL}/genres`)
       .then(res => setAvailableGenres(Array.from(new Set(res.data))))
       .catch(() => setError('Tidak dapat memuat daftar genre dari server.'));
   }, [setAvailableGenres, setError]);
@@ -59,14 +62,14 @@ function App() {
           setLoading(false);
           return;
         }
-        url = `http://localhost:3000/recommend?title=${encodeURIComponent(queryTitle.trim())}&metric=${metric}&limit=${resultsPerPage}`;
+        url = `${API_BASE_URL}/recommend?title=${encodeURIComponent(queryTitle.trim())}&metric=${metric}&limit=${resultsPerPage}`;
       } else { // mode === 'mood'
         if (Object.keys(moodWeights).length === 0) {
           setLoading(false);
           return;
         }
         const jsonWeights = JSON.stringify(moodWeights);
-        url = `http://localhost:3000/recommend/mood?weights=${encodeURIComponent(jsonWeights)}&metric=${metric}&limit=${resultsPerPage}`;
+        url = `${API_BASE_URL}/recommend/mood?weights=${encodeURIComponent(jsonWeights)}&metric=${metric}&limit=${resultsPerPage}`;
       }
 
       const response = await axios.get(url);
@@ -105,7 +108,7 @@ function App() {
       }
 
       const response = await axios.post(
-        'http://localhost:3000/recommend/fusion',
+        `${API_BASE_URL}/recommend/fusion`,
         {
           titleA: fusionTitleA.trim(),
           titleB: fusionTitleB.trim(),
@@ -141,7 +144,7 @@ function App() {
     } else if (err.response?.status === 500) {
       setError('Terjadi kesalahan di server. Silakan coba lagi.');
     } else if (err.code === 'ERR_NETWORK') {
-      setError('Tidak dapat terhubung ke server. Pastikan server berjalan di http://localhost:3000');
+      setError(`Tidak dapat terhubung ke server di ${API_BASE_URL}`);
     } else {
       setError('Terjadi kesalahan saat mengambil data dari server.');
     }

@@ -5,6 +5,7 @@
 import { Movie } from '../movie/movie.interface';
 
 export interface RecommendationResponse {
+  id: number;
   title: string;
   overview: string;
   genres: string[];
@@ -36,6 +37,7 @@ export function formatRecommendation(
   explanation?: string,
 ): RecommendationResponse {
   return {
+    id: movie.id,
     title: movie.title,
     overview: movie.overview,
     genres: movie.genres,

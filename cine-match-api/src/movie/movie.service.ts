@@ -29,15 +29,13 @@ export class MovieService implements OnModuleInit {
   }
 
   public createVector(movieGenres: string[], rating: number = 0): number[] {
-    // 1. Bagian Genre
+    // Create vector with only genre dimensions (no rating dimension)
+    // Rating is stored separately in the Movie object if needed
     const vector = new Array(this.genreDimensions.length).fill(0);
     movieGenres.forEach((genre) => {
       const index = this.genreDimensions.indexOf(genre);
       if (index !== -1) vector[index] = 1;
     });
-
-    // 2. Bagian Rating (Dimensi Terakhir) - Normalisasi / 10
-    vector.push(rating / 10);
 
     return vector;
   }
@@ -49,8 +47,7 @@ export class MovieService implements OnModuleInit {
       const index = this.genreDimensions.indexOf(genre);
       if (index !== -1) vector[index] = weight;
     });
-    // Default preferensi rating user dianggap tinggi (0.8)
-    vector.push(0.8);
+    // No need to append rating dimension - keep vector dimensions consistent
     return vector;
   }
 
