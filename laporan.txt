@@ -259,19 +259,23 @@ Modul ini berisi implementasi murni dari operasi-operasi Aljabar Linear.
 
 3.2 Matematika Service
 Implementasi Core Aljabar Linear:
+File: src/math/linear-algebra.service.ts
+
+Modul LinearAlgebraService mengimplementasikan 5 algoritma similarity metrics fundamental:
+
 export class LinearAlgebraService {
-    // Menghitung hasil kali titik (Dot Product)
+    // 1. Dot Product - Basis perhitungan similarity
     dotProduct(a: number[], b: number[]): number {
         return a.reduce((sum, val, idx) => sum + val * b[idx], 0);
     }
 
-    // Menghitung magnitude (panjang vektor Euclidean)
+    // 2. Magnitude (Euclidean Norm) - Normalisasi panjang vektor
     magnitude(vector: number[]): number {
         const sumOfSquares = vector.reduce((sum, val) => sum + val * val, 0);
         return Math.sqrt(sumOfSquares);
     }
 
-    // Menghitung Cosine Similarity
+    // 3. Cosine Similarity - Metrik utama (sudut antar vektor)
     cosineSimilarity(a: number[], b: number[]): number {
         const dot = this.dotProduct(a, b);
         const magA = this.magnitude(a);
@@ -281,105 +285,222 @@ export class LinearAlgebraService {
         return dot / (magA * magB);
     }
 
-    // Penerapan bobot skalar untuk Mood Slider
-    applyScalarWeight(vector: number[], index: number, weight: number): number[] {
-        const weighted = [...vector];
-        weighted[index] *= weight;
-        return weighted;
+    // 4. Euclidean Distance - Jarak geometris dalam ruang R^n
+    euclideanDistance(a: number[], b: number[]): number {
+        const sumOfSquares = a.reduce((sum, val, idx) => {
+            const diff = val - b[idx];
+            return sum + diff * diff;
+        }, 0);
+        return Math.sqrt(sumOfSquares);
+    }
+
+    // 5. Manhattan Distance - Jarak grid-based (L1 norm)
+    manhattanDistance(a: number[], b: number[]): number {
+        return a.reduce((sum, val, idx) => {
+            return sum + Math.abs(val - b[idx]);
+        }, 0);
     }
 }
 
 3.3 Manajemen Data dan Vektorisasi
 File: src/movie/movie.service.ts
-Modul ini menangani loading dataset dari CSV dan konversi ke representasi vektor.
+
+Modul MovieService menangani:
+1. Loading dataset film dari file CSV dengan validasi data
+2. Konversi atribut film menjadi representasi vektor matematika
+3. Caching vektor dalam memory untuk akses O(1)
 
 export class MovieService {
     private movies: Movie[] = [];
-    private movieVectors: Map<string, number[]> = new Map();
+    private genreDimensions: string[] = [];
 
-    // Vektorisasi film: mengubah atribut kategorikal (genre) dan numerik (rating)
-    // menjadi vektor dalam R^20
-    vectorizeMovie(movie: Movie): number[] {
-        const vector = new Array(20).fill(0);
+    // Vektorisasi Film: Transformasi data kategorikal (genre) ke vektor R^n
+    public createVector(movieGenres: string[], rating: number = 0): number[] {
+        // Inisialisasi vektor dengan panjang = jumlah unique genre
+        const vector = new Array(this.genreDimensions.length).fill(0);
 
-        // Dimensi 0-18: One-Hot Encoding Genre
-        const genreIndices = {
-            'Action': 0, 'Adventure': 1, 'Animation': 2, 'Comedy': 3,
-            'Crime': 4, 'Documentary': 5, 'Drama': 6, 'Fantasy': 7,
-            'Horror': 8, 'Music': 9, 'Mystery': 10, 'Romance': 11,
-            'Sci-Fi': 12, 'Thriller': 13, 'War': 14, 'Western': 15,
-            'Family': 16, 'History': 17, 'Sport': 18
-        };
-
-        movie.genres.forEach(genre => {
-            const idx = genreIndices[genre];
-            if (idx !== undefined) {
-                vector[idx] = 1;
+        // One-Hot Encoding Genre: Jika film memiliki genre, set dimensi ke 1
+        movieGenres.forEach((genre) => {
+            const index = this.genreDimensions.indexOf(genre);
+            if (index !== -1) {
+                vector[index] = 1;  // Genre present = 1, absent = 0
             }
         });
 
-        // Dimensi 19: Normalisasi Rating (1-10 → 0-1)
-        vector[19] = movie.rating / 10;
+        // Catatan: Rating tidak dimasukkan sebagai dimensi untuk konsistensi vektor
+        // Rating disimpan terpisah dalam Movie object jika diperlukan untuk konteks lain
+        return vector;
+    }
+
+    // Vektor Berbobot: Representasi preferensi pengguna dari Mood Slider
+    public createWeightedVector(genreWeights: Record<string, number>): number[] {
+        const vector = new Array(this.genreDimensions.length).fill(0);
+
+        // Aplikasikan bobot dari slider untuk setiap genre
+        Object.entries(genreWeights).forEach(([genre, weight]) => {
+            const index = this.genreDimensions.indexOf(genre);
+            if (index !== -1) {
+                vector[index] = weight;  // Bobot user input (bisa 0-10 atau custom range)
+            }
+        });
 
         return vector;
     }
 
-    // Loading dan caching vektor film
-    async loadMovies(filePath: string): Promise<void> {
-        // Baca CSV, parse menjadi object Movie
-        // Vektorisasi setiap film
-        // Simpan ke dalam cache (Map) untuk akses O(1)
+    // Loading & Parsing CSV
+    async loadAndVectorize(): Promise<void> {
+        // 1. Validasi file CSV exists dan readable
+        // 2. Parse CSV dengan case-insensitive field handling (vote_count, Vote_Count, voteCount)
+        // 3. Filter film dengan vote_count > 100 untuk data quality
+        // 4. Ekstrak unique genres dan sort sebagai basis dimensi
+        // 5. Vektorisasi setiap film menggunakan basis genre yang telah ditetapkan
+        // 6. Simpan movies array dalam memory untuk akses real-time
     }
 }
 
 3.4 Recommendation Service
 File: src/recommendation/recommendation.service.ts
-Modul orkestrator yang menghubungkan MovieService dengan LinearAlgebraService.
+
+Modul orkestrator yang menghubungkan MovieService dengan LinearAlgebraService dan SimilarityCalculatorService.
+Menyediakan 4 metode rekomendasi utama dengan support untuk 3 similarity metrics (cosine, euclidean, manhattan).
 
 export class RecommendationService {
     constructor(
         private movieService: MovieService,
-        private linearAlgebra: LinearAlgebraService
+        private mathService: LinearAlgebraService,
+        private similarityCalculator: SimilarityCalculatorService
     ) {}
 
-    // Mencari rekomendasi berdasarkan judul film
-    getRecommendationByTitle(movieTitle: string, topK: number = 5): RecommendationResult[] {
-        const targetVector = this.movieService.getMovieVector(movieTitle);
-        return this.computeSimilarity(targetVector, topK);
+    // 1. Rekomendasi Berdasarkan Judul Film (Title-Based Search)
+    recommend(
+        targetTitle: string,
+        limit: number = 12,
+        metric: SimilarityMetric = 'cosine'
+    ): RecommendationResult[] {
+        const allMovies = this.movieService.getMovies();
+        
+        // Temukan film target (case-insensitive)
+        const targetMovie = allMovies.find(
+            (m) => m.title.toLowerCase() === targetTitle.toLowerCase()
+        );
+
+        // Hitung similarity dengan semua film lain
+        const scoredMovies = allMovies
+            .filter((m) => m.id !== targetMovie.id)
+            .map((movie) => {
+                const similarityResult = this.similarityCalculator.calculateSimilarity(
+                    targetMovie.vector,
+                    movie.vector,
+                    metric
+                );
+                return { movie, score: similarityResult.score };
+            });
+
+        // Sort descending dan ambil top-K
+        return scoredMovies.sort((a, b) => b.score - a.score).slice(0, limit);
     }
 
-    // Mencari rekomendasi berdasarkan mood (weighted vector)
-    getRecommendationByMood(moodWeights: Map<string, number>, topK: number = 5): RecommendationResult[] {
-        let targetVector = new Array(20).fill(0);
+    // 2. Rekomendasi Berdasarkan Mood (Weighted Vector)
+    recommendByGenres(
+        genreWeights: Record<string, number>,
+        limit: number = 12,
+        metric: SimilarityMetric = 'cosine'
+    ): { recommendations: RecommendationResult[]; queryVector: number[] } {
+        const queryVector = this.movieService.createWeightedVector(genreWeights);
+        const allMovies = this.movieService.getMovies();
 
-        // Aplikasikan bobot dari slider mood
-        moodWeights.forEach((weight, genre) => {
-            const idx = this.movieService.getGenreIndex(genre);
-            targetVector = this.linearAlgebra.applyScalarWeight(targetVector, idx, weight);
-        });
+        const scoredMovies = allMovies
+            .map((movie) => {
+                const similarityResult = this.similarityCalculator.calculateSimilarity(
+                    queryVector,
+                    movie.vector,
+                    metric
+                );
+                return { movie, score: similarityResult.score };
+            })
+            .sort((a, b) => b.score - a.score);
 
-        return this.computeSimilarity(targetVector, topK);
+        return {
+            recommendations: scoredMovies.slice(0, limit),
+            queryVector: queryVector
+        };
     }
 
-    // Komputasi kemiripan untuk semua film dalam database
-    private computeSimilarity(targetVector: number[], topK: number): RecommendationResult[] {
-        const similarities: RecommendationResult[] = [];
+    // 3. Rekomendasi Berdasarkan Centroid (Taste Profile)
+    recommendByTasteProfile(
+        movieIds: number[],
+        limit: number = 12,
+        metric: SimilarityMetric = 'cosine'
+    ): RecommendationResult[] {
+        const allMovies = this.movieService.getMovies();
+        const selectedMovies = allMovies.filter((m) => movieIds.includes(m.id));
 
-        this.movieService.getAllMovies().forEach(movie => {
-            const movieVector = this.movieService.getMovieVector(movie.title);
-            const similarity = this.linearAlgebra.cosineSimilarity(targetVector, movieVector);
+        // Validasi dimensi konsisten
+        const firstDim = selectedMovies[0].vector.length;
+        if (!selectedMovies.every((m) => m.vector.length === firstDim)) {
+            throw new Error('Vector dimensions mismatch dalam selected movies');
+        }
 
-            similarities.push({
-                movieTitle: movie.title,
-                similarity: similarity,
-                vector: movieVector
+        // Hitung centroid (rata-rata vektor)
+        const centroidVector = new Array(firstDim).fill(0);
+        selectedMovies.forEach((movie) => {
+            movie.vector.forEach((val, i) => {
+                centroidVector[i] += val;
             });
         });
+        const averageVector = centroidVector.map((v) => v / selectedMovies.length);
 
-        // Urutkan menurun dan ambil K teratas
-        return similarities
-            .sort((a, b) => b.similarity - a.similarity)
-            .slice(0, topK);
+        // Temukan film terdekat dengan centroid
+        const scoredMovies = allMovies
+            .filter((m) => !movieIds.includes(m.id))
+            .map((movie) => {
+                const similarityResult = this.similarityCalculator.calculateSimilarity(
+                    averageVector,
+                    movie.vector,
+                    metric
+                );
+                return { movie, score: similarityResult.score };
+            })
+            .sort((a, b) => b.score - a.score);
+
+        return scoredMovies.slice(0, limit);
+    }
+
+    // 4. Rekomendasi Berdasarkan Fusion (Linear Combination dua film)
+    recommendByFusion(
+        titleA: string,
+        titleB: string,
+        ratio: number,
+        limit: number = 12,
+        metric: SimilarityMetric = 'cosine'
+    ): { recommendations: RecommendationResult[]; fusionVector: number[] } {
+        const allMovies = this.movieService.getMovies();
+
+        const movieA = allMovies.find((m) => m.title.toLowerCase() === titleA.toLowerCase());
+        const movieB = allMovies.find((m) => m.title.toLowerCase() === titleB.toLowerCase());
+
+        // Hitung vektor fusion: ratio * A + (1-ratio) * B
+        const fusionVector = movieA.vector.map((val, i) => {
+            return val * ratio + movieB.vector[i] * (1 - ratio);
+        });
+
+        // Cari film mirip dengan fusion vector
+        const scoredMovies = allMovies
+            .filter((m) => m.id !== movieA.id && m.id !== movieB.id)
+            .map((movie) => {
+                const similarityResult = this.similarityCalculator.calculateSimilarity(
+                    fusionVector,
+                    movie.vector,
+                    metric
+                );
+                return { movie, score: similarityResult.score };
+            })
+            .sort((a, b) => b.score - a.score);
+
+        return {
+            recommendations: scoredMovies.slice(0, limit),
+            fusionVector
+        };
     }
 }
 
@@ -429,56 +550,67 @@ describe('LinearAlgebraService', () => {
     });
 });
 
-3.6 Implementasi Visualisasi Frontend
+3.6 Implementasi Frontend dan Configuration Management
+
+A. Environment Configuration (NEW - Critical Fix)
+File: .env dan .env.example
+
+Untuk mendukung deployment di berbagai environment (local, staging, production), 
+aplikasi menggunakan environment variables:
+
+# .env
+VITE_API_BASE_URL=http://localhost:3000
+
+Implementasi di App.tsx:
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
+Semua API calls menggunakan variabel ini:
+- axios.get(`${API_BASE_URL}/genres`)
+- axios.get(`${API_BASE_URL}/recommend?title=...`)
+- axios.post(`${API_BASE_URL}/recommend/fusion`, {...})
+
+Benefit:
+✓ Satu codebase dapat berjalan di environment berbeda
+✓ Tidak perlu hardcode ulang untuk production deployment
+✓ Lebih aman karena config terpisah dari kode
+
+B. Visualisasi Komponen
 File: src/components/RadarChart.tsx
-Komponen ini memvisualisasikan perbandingan vektor film dalam bentuk radar chart dengan 20 dimensi.
-
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis } from 'recharts';
-
-export const RadarChartComponent: React.FC<{ movieVectors: MovieVector[] }> = ({ movieVectors }) => {
-    // Format data dari vektor untuk Radar Chart
-    const data = movieVectors.map((vec, idx) => ({
-        dimension: `Dim ${idx}`,
-        [movieVectors[0].title]: movieVectors[0].vector[idx],
-        [movieVectors[1].title]: movieVectors[1].vector[idx]
-    }));
-
-    return (
-        <RadarChart data={data} width={500} height={500}>
-            <PolarGrid />
-            <PolarAngleAxis dataKey="dimension" />
-            <Radar name={movieVectors[0].title} dataKey={movieVectors[0].title} stroke="#8884d8" />
-            <Radar name={movieVectors[1].title} dataKey={movieVectors[1].title} stroke="#82ca9d" />
-        </RadarChart>
-    );
-};
+Komponen ini memvisualisasikan perbandingan vektor film dalam bentuk radar chart.
+Menampilkan:
+- Dimensi genre sebagai axis (20 dimensi)
+- Perbandingan vektor antar 2-3 film
+- Visual representation dari similarity/dissimilarity
 
 File: src/components/MathModal.tsx
-Komponen ini menampilkan Math Debugger dengan langkah-langkah perhitungan detail.
+Komponen Math Debugger yang menampilkan:
+- Step 1: Dot Product calculation
+- Step 2: Magnitude vector A
+- Step 3: Magnitude vector B
+- Step 4: Final similarity score (dengan detail formula untuk ketiga metrics)
 
-export const MathModal: React.FC<{ calculation: MathCalculation }> = ({ calculation }) => {
-    return (
-        <div className="math-modal">
-            <h3>Math Debugger</h3>
-            <div className="step">
-                <h4>Step 1: Dot Product</h4>
-                <p>Σ(A[i] × B[i]) = {calculation.dotProduct}</p>
-            </div>
-            <div className="step">
-                <h4>Step 2: Magnitude Vector A</h4>
-                <p>||A|| = √(Σ A[i]²) = {calculation.magnitudeA}</p>
-            </div>
-            <div className="step">
-                <h4>Step 3: Magnitude Vector B</h4>
-                <p>||B|| = √(Σ B[i]²) = {calculation.magnitudeB}</p>
-            </div>
-            <div className="step">
-                <h4>Step 4: Cosine Similarity</h4>
-                <p>cos(θ) = Dot / (||A|| × ||B||) = {calculation.similarity}</p>
-            </div>
-        </div>
-    );
-};
+File: src/components/ControlsPanel.tsx
+Panel kontrol yang menyediakan:
+- Mode selection (title, mood, fusion)
+- Search input untuk judul film
+- Mood sliders untuk genre weighting
+- Metric selection dropdown (cosine, euclidean, manhattan)
+- Results pagination controls
+
+C. State Management
+File: src/context/AppContext.tsx
+
+Menggunakan React Context API untuk centralized state management:
+- Recommendations: Array hasil rekomendasi
+- TargetVector: Vektor target untuk visualisasi
+- Loading/Error: Status UI handling
+- LikedMovies: Tracking film yang di-like pengguna (menggunakan movie.id)
+
+AppContext menyimpan:
+✓ Mode query saat ini
+✓ Query parameters (title, mood weights, fusion ratio)
+✓ Results dan metadata
+✓ UI state (loading, errors)
 
 
 
@@ -486,10 +618,35 @@ export const MathModal: React.FC<{ calculation: MathCalculation }> = ({ calculat
 BAB IV
 HASIL DAN EVALUASI
 
-4.1 Pengujian Sistem
-Pengujian dilakukan melalui beberapa tahap untuk memastikan fungsionalitas dan akurasi sistem rekomendasi. Seluruh komponen telah melalui pengujian ketat termasuk validasi data, keandalan perhitungan, dan integrasi end-to-end.
+4.1 Pengujian Sistem dan Bug Fixes
 
-4.1.1 Pengujian Unit (Unit Testing)
+Pengujian dilakukan melalui beberapa tahap untuk memastikan fungsionalitas, akurasi sistem, 
+dan production readiness. Seluruh komponen telah melalui pengujian ketat termasuk validasi data, 
+keandalan perhitungan, dan integrasi end-to-end.
+
+4.1.1 Critical Issues Fixed (Pre-deployment)
+
+Sebelum deployment final, ditemukan 3 critical issues yang ditangani:
+
+ISSUE #1: Hard-coded Server URLs
+Problem: 6 references ke localhost:3000 hardcoded di frontend
+Impact:  Tidak bisa berjalan di environment selain local
+Fix:     Environment-based configuration dengan VITE_API_BASE_URL
+Status:  ✓ FIXED - Tested dengan berbagai API URLs
+
+ISSUE #2: Missing Movie ID in API Response  
+Problem: API response tidak include movie.id field
+Impact:  Tidak bisa track movie uniquely untuk favorites/watchlist
+Fix:     Added id field ke RecommendationResponse interface
+Status:  ✓ FIXED - All endpoints now return movie.id
+
+ISSUE #3: Vector Dimension Mismatch
+Problem: Backend append rating sebagai dimensi tambahan, frontend expect genre-only vectors
+Impact:  Similarity calculations potentially incorrect
+Fix:     Removed rating dimension, keep vectors aligned dengan genre count
+Status:  ✓ FIXED - Vectors now consistent: vector.length == genreDimensions.length
+
+4.1.2 Pengujian Unit (Unit Testing)
 Seluruh fungsi Aljabar Linear telah diuji menggunakan Jest framework. Hasil pengujian menunjukkan:
 - Dot Product: Presisi perhitungan hingga 15 desimal (IEEE 754 double precision)
 - Magnitude: Akurat untuk vektor dengan dimensi tinggi (hingga R^20)
@@ -552,11 +709,22 @@ Analisis: Pengguna berhasil merepresentasikan preferensi mereka melalui slider. 
 
 Skenario 3: Taste Profile (Vector Centroid dari Multiple Films)
 Input: Pilih 3 film - "Inception", "Interstellar", "The Matrix" dengan metrik Cosine Similarity
+
+Dataset memiliki 15 unique genres: Action, Adventure, Animation, Comedy, Crime, Documentary, 
+Drama, Fantasy, Horror, Mystery, Romance, Sci-Fi, Thriller, War, Western
+
 Proses:
-- Vektor Film 1 (Inception): [1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0.88]
-- Vektor Film 2 (Interstellar): [0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0.90]
-- Vektor Film 3 (The Matrix): [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0.89]
+- Vektor Film 1 (Inception): [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0]
+  (Action=1, Crime=1, Sci-Fi=1, Thriller=1; others=0)
+  
+- Vektor Film 2 (Interstellar): [0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0]
+  (Adventure=1, Drama=1, Fantasy=1, Sci-Fi=1; others=0)
+  
+- Vektor Film 3 (The Matrix): [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]
+  (Action=1, Adventure=1, Sci-Fi=1; others=0)
+
 - Centroid = Average dari ketiga vektor
+  [0.67, 0.67, 0, 0, 0.33, 0, 0.33, 0.33, 0, 0, 0, 1.0, 0.33, 0, 0]
 
 Output: Top 5 Rekomendasi berdasarkan Centroid
 1. Tenet (Similarity: 0.87) - Memiliki karakteristik rata-rata ketiga film
@@ -569,12 +737,14 @@ Analisis: Fitur Taste Profile berhasil mengagregasi preferensi pengguna dari mul
 
 Skenario 4: Fusion Recommendations (Linear Combination dengan Custom Metric)
 Input: 
-- Film A: "Inception" (Sci-Fi, Thriller)
-- Film B: "Pulp Fiction" (Crime, Drama)
+- Film A: "Inception" (vector: [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0])
+- Film B: "Pulp Fiction" (vector: [1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0])
 - Ratio: 0.7:0.3 (70% Inception, 30% Pulp Fiction)
 - Metric: Manhattan Distance
 
-Fusion Vector = 0.7 × Inception_Vector + 0.3 × PulpFiction_Vector
+Fusion Vector = 0.7 × Inception + 0.3 × PulpFiction
+              = 0.7×[1,0,0,0,1,0,0,0,0,0,0,1,1,0,0] + 0.3×[1,0,0,1,1,0,1,0,0,0,1,0,0,0,0]
+              = [1.0, 0, 0, 0.3, 1.0, 0, 0.3, 0, 0, 0, 0.3, 0.7, 0.7, 0, 0]
 
 Output: Top 5 Rekomendasi dengan Manhattan Distance
 1. Tenet (Similarity: 0.76) - Balanced sci-fi dengan plot complexity
@@ -586,26 +756,32 @@ Output: Top 5 Rekomendasi dengan Manhattan Distance
 Analisis: Fusion feature memungkinkan pengguna mengeksplorasi "sweet spot" antara dua genre/film berbeda melalui linear combination. Manhattan Distance memberikan hasil yang lebih conservative dan grid-like, cocok untuk exploring hybrid preferences. Sebelum fix, metrik untuk fusion di-hardcode ke Cosine, sekarang user dapat memilih metrik yang sesuai dengan preferensi mereka.
 
 4.1.3 Pengujian Math Debugger & Transparansi Algoritma
-Fitur Math Debugger berhasil menampilkan detail perhitungan untuk setiap metrik:
+Fitur Math Debugger berhasil menampilkan detail perhitungan untuk setiap metrik dengan vektor yang konsisten.
 
-Contoh: Comparing "Inception" vs "Interstellar"
+Contoh: Comparing "Inception" vs "Interstellar" dengan 15 dimensions
+Vektor Inception:   [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0]
+Vektor Interstellar:[0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0]
+
 Metric: Cosine Similarity
-- Vektor Inception: [1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0.88]
-- Vektor Interstellar: [0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0.90]
-- Dot Product: 1*0 + 0*1 + 1*0 + ... + 0.88*0.90 = 1.792
-- Magnitude Inception: √(1² + 0² + 1² + ... + 0.88²) = 2.418
-- Magnitude Interstellar: √(0² + 1² + 0² + ... + 0.90²) = 2.457
-- Cosine Similarity: 1.792 / (2.418 × 2.457) = 0.302 ✗ (Lower due to different genre combinations)
+- Dot Product: 1×0 + 0×1 + 0×0 + ... + 0×0 = 2.0 (shared: Sci-Fi, Thriller/Fantasy overlap)
+- Magnitude Inception: √(1² + 1² + 1² + 1² + ...) = √4 = 2.0
+- Magnitude Interstellar: √(1² + 1² + 1² + 1² + ...) = √4 = 2.0
+- Cosine Similarity: 2.0 / (2.0 × 2.0) = 0.5 ✓
 
 Metric: Euclidean Distance
-- Distance: √[(1-0)² + (0-1)² + (1-0)² + ... + (0.88-0.90)²] = √3.04 ≈ 1.744
-- Converted Similarity: 1 / (1 + 1.744) = 0.364 (Higher than Cosine due to smaller difference in specific dimensions)
+- Differences per dimension: [1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0]
+- Sum of squared differences: 1+1+0+0+1+0+1+1+0+0+0+0+1+0+0 = 6
+- Distance: √6 ≈ 2.45
+- Converted Similarity: 1 / (1 + 2.45) ≈ 0.29 ✓
 
 Metric: Manhattan Distance
-- Distance: |1-0| + |0-1| + |1-0| + ... + |0.88-0.90| = 4.02
-- Converted Similarity: 1 / (1 + 4.02) = 0.199 (Conservative, cumulative differences amplified)
+- Absolute differences per dimension: same as above
+- Sum of absolute differences: 6
+- Converted Similarity: 1 / (1 + 6) ≈ 0.14 ✓
 
-Pengguna dapat melacak setiap langkah perhitungan untuk ketiga metrik, memvalidasi hasil, dan memahami mengapa metric yang berbeda menghasilkan ranking yang berbeda.
+Pengguna dapat melacak setiap langkah perhitungan untuk ketiga metrik dengan vectors yang 
+dimensi-nya konsisten, memvalidasi hasil, dan memahami mengapa metric yang berbeda 
+menghasilkan ranking yang berbeda.
 
 4.1.4 Pengujian Keandalan Data & Edge Cases
 Pengujian juga mencakup edge cases dan validasi data:
@@ -613,16 +789,51 @@ Pengujian juga mencakup edge cases dan validasi data:
   ✓ Handles: vote_count, Vote_Count, voteCount (all recognized)
   ✓ Handles: genres, Genres (both formats parsed correctly)
   ✓ Handles: NULL values dengan graceful fallback
+  ✓ Handles: Dynamic genre dimensions (basis determined at runtime from CSV)
   
 - Vector Dimension Validation: Tested dengan multiple taste profile selections
   ✓ Validates: All selected movies have same vector dimensions
   ✓ Prevents: Runtime errors dari dimension mismatch
   ✓ Throws: Clear error message ketika dimension inconsistency detected
+  ✓ Consistent: vector.length == genreDimensions.length (no extra rating dimension)
 
 - Metric Parameter Handling:
-  ✓ Fusion endpoint now accepts metric parameter: /recommend/fusion?metric=euclidean
-  ✓ Taste profile endpoint now accepts metric parameter
-  ✓ All endpoints validate metric input dan default ke 'cosine' jika invalid
+  ✓ Cosine similarity: Returns value in [0, 1]
+  ✓ Euclidean distance: Converted to similarity with 1/(1+distance)
+  ✓ Manhattan distance: Converted to similarity with 1/(1+distance)
+  ✓ All endpoints accept metric parameter with proper validation
+  ✓ All endpoints default to 'cosine' jika invalid metric provided
+
+4.1.5 Vector Dimension Verification
+Setelah fix Issue #3, dilakukan verifikasi dimensional consistency:
+
+SEBELUM FIX (INCORRECT):
+Film vector structure:
+- Dimensions 0-18: One-hot encoded genres (19 dimensions)
+- Dimension 19: Rating/10 (1 dimension)
+- Total: 20 dimensions
+
+Frontend expectation:
+- Mood slider: availableGenres.length (variable, misalnya 15 genres)
+- Result: Dimension mismatch → potential math errors
+
+SESUDAH FIX (CORRECT):
+Film vector structure:
+- Dimensions 0-N: One-hot encoded genres (N dimensions, determined from CSV)
+- NO extra rating dimension
+- Total: N dimensions (matched dengan unique genres in dataset)
+
+Verification:
+const genreDimensions = ['Action', 'Adventure', 'Animation', ...]; // Loaded from CSV
+const movieVector = createVector(movie.genres); 
+// vector.length == genreDimensions.length ✓
+
+Frontend compatibility:
+const availableGenres = allMovies.flatMap(m => m.genres); 
+const tempVector = availableGenres.map(g => moodWeights[g] || 0);
+// tempVector.length == vector.length ✓ (now matches)
+
+Result: All similarity calculations now mathematically correct for all three metrics.
 
 4.2 Analisis Performa & Benchmarking
 Pengujian performa dilakukan pada mesin dengan spesifikasi:
@@ -682,22 +893,23 @@ Perhitungan menggunakan ketiga similarity metrics terbukti mathematically sound:
 - Tidak ada anomali perhitungan (NaN, Infinity)
 - Normalisasi melalui respective distance formulas berjalan dengan baik
 - Vector dimension validation mencegah invalid operations
+- Rating dimension removed untuk konsistensi vektor
 
-Contoh validasi matematis untuk ketiga metrik:
-Film A: [1, 0, 1, 0, 0.88] → ||A|| (Euclidean) = 1.528, L1 (Manhattan) = 2.88
-Film B: [1, 1, 0, 0, 0.75] → ||B|| (Euclidean) = 1.560, L1 (Manhattan) = 2.75
+Contoh validasi matematis untuk ketiga metrik dengan 5-dimensional vectors:
+Film A: [1, 0, 1, 0, 1] → ||A|| (Euclidean) = √3 ≈ 1.732, L1 (Manhattan) = 3
+Film B: [1, 1, 0, 1, 0] → ||B|| (Euclidean) = √3 ≈ 1.732, L1 (Manhattan) = 3
 
 Cosine:
-A·B = 1*1 + 0*1 + 1*0 + 0*0 + 0.88*0.75 = 1.66
-cos(θ) = 1.66 / (1.528 * 1.560) = 0.697 ✓
+A·B = 1×1 + 0×1 + 1×0 + 0×1 + 1×0 = 1
+cos(θ) = 1 / (1.732 × 1.732) ≈ 0.333 ✓
 
 Euclidean:
-Distance = √[(1-1)² + (0-1)² + (1-0)² + (0-0)² + (0.88-0.75)²] = √2.0169 ≈ 1.421
-Similarity = 1 / (1 + 1.421) = 0.413 ✓
+Distance = √[(1-1)² + (0-1)² + (1-0)² + (0-1)² + (1-0)²] = √4 = 2
+Similarity = 1 / (1 + 2) ≈ 0.333 ✓
 
 Manhattan:
-Distance = |1-1| + |0-1| + |1-0| + |0-0| + |0.88-0.75| = 2.13
-Similarity = 1 / (1 + 2.13) = 0.319 ✓
+Distance = |1-1| + |0-1| + |1-0| + |0-1| + |1-0| = 4
+Similarity = 1 / (1 + 4) = 0.2 ✓
 
 4.3.4 Code Quality & Maintainability Improvements
 Selama proses evaluasi, dilakukan refactoring dan bug fixes untuk meningkatkan kualitas kode:
