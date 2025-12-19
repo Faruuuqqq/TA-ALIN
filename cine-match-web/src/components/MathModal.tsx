@@ -139,7 +139,7 @@ export const MathModal = ({
               fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s'
             }}
           >
-            🧮 Pembuktian Rumus
+            Pembuktian Rumus
           </button>
         </div>
         
@@ -149,7 +149,7 @@ export const MathModal = ({
           {activeTab === 'visual' && (
             <div className="visual-tab">
               <div style={{background: 'rgba(99, 102, 241, 0.1)', padding: '20px', borderRadius: '12px', marginBottom: '20px', border: '1px solid rgba(99, 102, 241, 0.3)'}}>
-                <h3 style={{marginTop: 0, color: '#818cf8', fontSize: '1.1rem'}}>💡 Mengapa film ini muncul?</h3>
+                <h3 style={{marginTop: 0, color: '#818cf8', fontSize: '1.1rem'}}>Mengapa film ini muncul?</h3>
                 <p style={{lineHeight: '1.6', color: '#cbd5e1', margin: 0}}>
                   {metric === 'cosine' && `Sistem mendeteksi pola vektor film ini memiliki sudut yang sangat kecil (≈ ${(Math.acos(parseFloat(score)) * (180 / Math.PI)).toFixed(1)}°) dengan preferensi pencarian Anda.`}
                   {metric === 'euclidean' && `Sistem mendeteksi bahwa jarak Euclidean antara vektor film dan preferensi Anda sangat kecil (${euclideanDist.toFixed(3)}), menunjukkan kesamaan tinggi.`}
@@ -157,7 +157,7 @@ export const MathModal = ({
                 </p>
               </div>
 
-              <h4 style={{marginBottom: '15px', color: '#e2e8f0'}}>✨ Faktor Penentu Utama:</h4>
+              <h4 style={{marginBottom: '15px', color: '#e2e8f0'}}>Faktor Penentu Utama:</h4>
               {matchingGenres.length > 0 ? (
                 <div style={{display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px'}}>
                   {matchingGenres.map(g => (
@@ -265,7 +265,7 @@ export const MathModal = ({
 
               {/* Calculations */}
               <div style={{marginTop: '25px', padding: '20px', background: '#0f172a', borderRadius: '8px', border: '1px solid #334155'}}>
-                <h3 style={{marginTop: 0, color: '#a5b4fc', fontSize: '0.95rem', marginBottom: '15px'}}>🔢 Tahap Perhitungan:</h3>
+                <h3 style={{marginTop: 0, color: '#a5b4fc', fontSize: '0.95rem', marginBottom: '15px'}}>Tahap Perhitungan:</h3>
                 
                 <div style={{marginBottom: '15px', padding: '10px', background: '#1e293b', borderRadius: '6px'}}>
                   <p style={{margin: '0 0 5px', color: '#94a3b8', fontSize: '0.85rem'}}>Langkah 1:</p>

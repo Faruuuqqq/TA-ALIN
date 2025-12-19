@@ -11,7 +11,7 @@ export const GenreRadarChart = ({ allGenres, movieGenres, targetGenres }: Props)
   // Kita tambahkan slice(0, allGenres.length) untuk jaga-jaga
   const relevantGenres = allGenres.filter(g => movieGenres.includes(g) || targetGenres.includes(g));
   
-  // Jika genre terlalu sedikit, tambah dummy dari list awal biar grafik bagus
+  // Jika genre terlalu sedikit, tambah dummy dari list awal
   const displayGenres = relevantGenres.length < 4 ? allGenres.slice(0, 6) : relevantGenres;
 
   const data = displayGenres.map(g => ({

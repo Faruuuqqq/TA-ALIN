@@ -51,10 +51,6 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
       [genre]: Math.max(0, parseInt(value, 10)),
     });
   };
-
-  // UX Improvement: Tombol Reset
-  // Karena state ada di parent (App.tsx), kita minta user uncheck manual atau reload untuk full reset
-  // Tapi kita bisa sediakan helper visual.
   
   return (
     <div className="controls-wrapper">
